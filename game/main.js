@@ -414,6 +414,7 @@ function frame(now){
     const near=updateGuide();uiTimer-=dt;if(uiTimer<=0){updateUi(near);uiTimer=.08;}
   }else{guide.visible=false;marker.visible=false;}
   world.update(visualTime,dt,boat);updatePlayerVisual();updateCamera(dt);effects.update(phase==='playing'?dt:0,camera);
+  world.occlusion.update(camera,renderer,playerModel.position,dt);
   for(const cannon of shipParts.cannons){cannon.userData.recoil=Math.max(0,(cannon.userData.recoil||0)-dt*4);cannon.position.z=-cannon.userData.side*Math.sin(cannon.userData.recoil*Math.PI*.5)*.13;}
   shadowTimer-=dt;if(shadowTimer<=0){renderer.shadowMap.needsUpdate=true;shadowTimer=settings.quality==='high'?.033:.10;}
   renderer.render(scene,camera);requestAnimationFrame(frame);

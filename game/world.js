@@ -4,6 +4,7 @@ import {TERRAIN,REGIONS,OBSTACLES,CORALHAVEN,regionAt} from './archipelago-data.
 import {createTerrainBase,createVillageBase,detailsForRegion,createArches,createWhirlpoolVisuals,releaseChunk,instanceKit,consolidateChunk} from './archipelago-art.js';
 import {createIsland} from '../ship-preview/island.js';
 import {batchStatic} from './optimization.js';
+import {createCameraOcclusion} from './camera-occlusion.js';
 function createSea(){
  const size=256,data=new Uint8Array(size*size*4);
  for(let z=0;z<size;z++)for(let x=0;x<size;x++){
@@ -32,7 +33,8 @@ export function createWorld(scene){
  const chunks=REGIONS.map(r=>{const village=createVillageBase(r);far.add(village);return {region:r,village,detail:null,generator:null,ready:false,lastNear:0};});
  createArches(far);const ocean=createSea();scene.add(ocean.mesh);const whirlUpdate=createWhirlpoolVisuals(scene);
  let clock=0,overview=false,totalBuilt=0,totalReleased=0;const batching={before:0,after:0};far.traverse(o=>{if(o.isMesh){batching.before+=o.isInstancedMesh?o.count:1;batching.after++;}});
- const world={obstacles:OBSTACLES,outposts:[],sun,ocean,batching,far,
+ const occlusion=createCameraOcclusion();occlusion.attach(far);
+ const world={obstacles:OBSTACLES,outposts:[],sun,ocean,batching,far,occlusion,
   setOverview(value){overview=value;ocean.setOverview(value);scene.fog=value?null:new THREE.Fog(0xa8c6cc,62,155);},
   stats:()=>({loaded:chunks.filter(c=>c.ready).length,building:chunks.filter(c=>c.generator).length,built:totalBuilt,released:totalReleased}),
   update(time,dt,player){
@@ -47,7 +49,7 @@ export function createWorld(scene){
    }
    // One bounded region job per frame. Yield between each building/tree cluster.
    const task=sorted.find(({c})=>c.generator)?.c;
-   if(task){const deadline=performance.now()+2;let count=0;do{const result=task.generator.next();if(result.done){consolidateChunk(task.detail);task.generator=null;task.ready=true;task.detail.visible=true;task.village.userData.homes.visible=false;totalBuilt++;break;}task.detail.add(result.value);count++;}while(count<3&&performance.now()<deadline);}
+   if(task){const deadline=performance.now()+2;let count=0;do{const result=task.generator.next();if(result.done){consolidateChunk(task.detail);occlusion.attach(task.detail);task.generator=null;task.ready=true;task.detail.visible=true;task.village.userData.homes.visible=false;totalBuilt++;break;}task.detail.add(result.value);count++;}while(count<3&&performance.now()<deadline);}
    for(const c of chunks)if(c.detail&&c.ready)c.detail.visible=overview||Math.hypot(player.x-c.region.x,player.z-c.region.z)<140;
   },regionAt};
  return world;

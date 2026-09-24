@@ -1,0 +1,13 @@
+<!doctype html><html lang="zh-Hant"><meta charset="utf-8"><title>船身遮擋鏤空檢查</title><style>body{margin:0;background:#a8c6cc;color:white;font:16px system-ui}p{position:fixed;top:10px;left:18px;text-shadow:0 1px 4px #123;pointer-events:none}</style><script type="importmap">{"imports":{"three":"/node_modules/three/build/three.module.js","three/addons/":"/node_modules/three/examples/jsm/"}}</script><p id="status"></p><script type="module">
+import * as THREE from 'three';
+import {createWorld} from './world.js';
+import {createShip} from '../ship-preview/ship.js';
+import {batchStatic} from './optimization.js';
+const scene=new THREE.Scene(),world=createWorld(scene),camera=new THREE.PerspectiveCamera(54,innerWidth/innerHeight,.1,240);
+const renderer=new THREE.WebGLRenderer({antialias:true});renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(Math.min(devicePixelRatio,1.25));renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.2;document.body.appendChild(renderer.domElement);
+const {ship}=createShip();ship.scale.setScalar(.72);ship.position.set(0,.4,-65);batchStatic(ship);scene.add(ship);
+camera.position.set(23,34,-38);camera.lookAt(0,0,-65);
+const enabled=!new URLSearchParams(location.search).has('off');document.querySelector('#status').textContent=enabled?'鏤空開啟 · 攝影機位於山體內，船身與周圍水面保持可見':'鏤空關閉 · 相同攝影機位置，山體遮住船身';
+let last=performance.now(),time=0;function frame(now){const dt=Math.min(.05,(now-last)/1000);last=now;time+=dt;world.update(time,dt,ship.position);world.occlusion.update(camera,renderer,ship.position,dt,enabled);renderer.render(scene,camera);requestAnimationFrame(frame);}requestAnimationFrame(frame);
+addEventListener('resize',()=>{renderer.setSize(innerWidth,innerHeight);camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();});
+</script></html>
