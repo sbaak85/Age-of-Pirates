@@ -16,6 +16,9 @@ for(const region of REGIONS){
  for(let j=-2;j<=2;j++){
   const a=region.angle+j*.16+(j===0?0:Math.sin(j*3.7+region.tier)*.025);
   const p=polar(a,j===0?169:166+(Math.abs(j)%2)*5+Math.sin(j*2.4+region.tier)*2);
+  // Leave a ship-width water channel below each of the two bridge houses.
+  if(region.id==='harbor'&&j===-2){p.x+=Math.sin(region.angle)*30;p.z-=Math.cos(region.angle)*30;}
+  if(region.id==='harbor'&&j===2){p.x-=Math.sin(region.angle)*30;p.z+=Math.cos(region.angle)*30;}
   const rx=j===0?33:region.id==='reef'?19+Math.abs(j)*2:region.id==='redrock'?13+Math.abs(j):16+((j+region.tier+5)%3)*2;
   const rz=j===0?33:region.id==='fjord'?14+Math.abs(j)*2:region.id==='reef'?19:16+((j*2+region.tier+6)%3)*2;
   const h=j===0?5.2:region.id==='reef'?8+Math.abs(j)*2:region.id==='redrock'?27+Math.abs(j)*5:region.id==='fjord'?32+Math.abs(j)*7:region.tier*5+11+(j+2)%3*3;
@@ -28,6 +31,7 @@ for(const region of REGIONS){
  }
  // Two smaller satellites per coast create varied shore silhouettes and narrower, readable waterways.
  const outer=polar(region.angle+.38,183),inner=polar(region.angle-.36,78);
+ if(region.id==='harbor'){outer.x-=Math.sin(region.angle)*30;outer.z+=Math.cos(region.angle)*30;}
  TERRAIN.push({...outer,rx:region.id==='reef'?12:8,rz:region.id==='fjord'?13:10,h:region.id==='reef'?5:9+region.tier*2,region:region.id,seed:TERRAIN.length});
  TERRAIN.push({...inner,rx:region.id==='redrock'?8:10,rz:region.id==='mist'?13:9,h:region.id==='reef'?6:12+region.tier*3,region:region.id,seed:TERRAIN.length});
 }

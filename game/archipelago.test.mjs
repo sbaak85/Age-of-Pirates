@@ -2,11 +2,12 @@ import test from 'node:test';import assert from 'node:assert/strict';
 import {REGIONS,ENCOUNTERS,LOOT,WHIRLPOOLS,START,MAP_RADIUS,CORALHAVEN,navigable,whirlpoolForce,upgradeOffer,specialtyOffer} from './archipelago-data.js';
 import {createBoatState,stepBoat} from './physics.js';
 import {createWorld} from './world.js';import * as THREE from 'three';
-import {BUILDING_TYPES,buildingTypeFor,villageSlots,createTerrainBase} from './archipelago-art.js';
+import {BUILDING_TYPES,buildingTypeFor,villageSlots,createTerrainBase,createVillageBase} from './archipelago-art.js';
 import {TERRAIN} from './archipelago-data.js';
 test('original handcrafted island is restored beside the first port without blocking pickups',()=>{
  const scene=new THREE.Scene(),world=createWorld(scene),island=world.far.getObjectByName('Coralhaven · original handmade island');
  assert.ok(island);assert.ok(Math.hypot(island.position.x-REGIONS[0].dock.x,island.position.z-REGIONS[0].dock.z)<30);
+ for(const side of ['西側','東側'])assert.ok(world.far.getObjectByName(`暖沙港 · ${side}空中橋屋`),`${side} bridge is missing from the playable world`);
  assert.equal(navigable(CORALHAVEN.x,CORALHAVEN.z),false);
  for(const item of [...ENCOUNTERS,...LOOT]){const x=item.start?.[0]??item.x,z=item.start?.[1]??item.z;assert.ok(navigable(x,z,2),item.id);}
 });
@@ -16,6 +17,27 @@ test('each port has ten distinct building silhouettes and a stable staggered lay
 });
 test('central canyon cliffs keep their intended long axis',()=>{
  for(const t of TERRAIN.filter(t=>t.seed>=51)){const g=createTerrainBase(t),bounds=new THREE.Box3().setFromObject(g),size=bounds.getSize(new THREE.Vector3());assert.ok(size.z>size.x*1.5,`central cliff ${t.seed} turned sideways`);}
+});
+test('both Warm Sand channels stay navigable below skyhouses and upper cliff walls face outward',()=>{
+ const village=createVillageBase(REGIONS[0]);
+ for(const [mainSeed,isletSeed,label] of [[1,0,'西側'],[3,4,'東側']]){
+  const islet=TERRAIN.find(t=>t.seed===isletSeed),mainland=TERRAIN.find(t=>t.seed===mainSeed);
+  const dx=islet.x-mainland.x,dz=islet.z-mainland.z,length=Math.hypot(dx,dz);
+  const midX=(islet.x+mainland.x)/2,midZ=(islet.z+mainland.z)/2;
+  for(let offset=-30;offset<=30;offset+=2)assert.ok(navigable(midX-dz/length*offset,midZ+dx/length*offset,3),`${label} channel ${offset}`);
+  const skyhouse=village.getObjectByName(`暖沙港 · ${label}空中橋屋`);
+  assert.ok(skyhouse);assert.ok(new THREE.Box3().setFromObject(skyhouse).min.y>8,`${label} skyhouse must clear the player ship`);
+ }
+ for(const t of [TERRAIN[0],TERRAIN[1],TERRAIN[3],TERRAIN[4]]){
+  const shelf=createTerrainBase(t).children.find(m=>m.isMesh&&m.geometry.attributes.position.count===72);
+  assert.ok(shelf,`upper shelf ${t.seed}`);
+  const positions=shelf.geometry.attributes.position,index=shelf.geometry.index;
+  const a=new THREE.Vector3().fromBufferAttribute(positions,index.getX(0));
+  const b=new THREE.Vector3().fromBufferAttribute(positions,index.getX(1));
+  const c=new THREE.Vector3().fromBufferAttribute(positions,index.getX(2));
+  const normal=b.sub(a).cross(c.sub(a));
+  assert.ok(normal.dot(new THREE.Vector3(a.x,0,a.z))>0,`upper shelf ${t.seed} faces inward`);
+ }
 });
 test('five ports, all encounters and loot spawn in accessible water',()=>{
  assert.equal(REGIONS.length,5);assert.equal(ENCOUNTERS.length,30);assert.equal(LOOT.length,40);

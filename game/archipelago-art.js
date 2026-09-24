@@ -7,7 +7,19 @@ roofGeo.setAttribute('position',new THREE.Float32BufferAttribute([-1,0,-1,1,0,-1
 const sp=stoneGeo.attributes.position;
 for(let i=0;i<sp.count;i++){const a=Math.atan2(sp.getZ(i),sp.getX(i)),factor=1+.08*Math.sin(a*3+.4)+.04*Math.cos(a*5);sp.setX(i,sp.getX(i)*factor*.93);sp.setZ(i,sp.getZ(i)*factor*.93);}stoneGeo.computeVertexNormals();
 const trunkGeo=new THREE.CylinderGeometry(.52,.72,1,7),coneGeo=new THREE.ConeGeometry(1,1,8),roundGeo=new THREE.CylinderGeometry(1,1,1,10);
-const shared=new Set([boxGeo,stoneGeo,roofGeo,leafGeo,trunkGeo,coneGeo,roundGeo]);
+function coastalCragGeometry(){
+ const n=11,rings=[[-1,.78],[-.25,1],[.27,.83],[1,.42]],vertices=[],indices=[];
+ for(let k=0;k<rings.length;k++)for(let j=0;j<n;j++){
+  const a=j/n*Math.PI*2,noise=1+.17*Math.sin(a*3+.4)+.10*Math.cos(a*5-.8)+.065*Math.sin(a*8+1.2);
+  const radius=rings[k][1]*noise*(1+.055*Math.sin(k*2.8+j*.7));
+  vertices.push(Math.cos(a)*radius+(k>1?.12:0),rings[k][0]+.065*Math.sin(j*2.6+k),Math.sin(a)*radius);
+ }
+ for(let k=0;k<rings.length-1;k++)for(let j=0;j<n;j++){const a=k*n+j,b=k*n+(j+1)%n;indices.push(a,a+n,b,b,a+n,b+n);}
+ vertices.push(.1,1.15,0);const top=rings.length*n;for(let j=0;j<n;j++)indices.push(top,(rings.length-1)*n+(j+1)%n,(rings.length-1)*n+j);
+ const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.Float32BufferAttribute(vertices,3));geo.setIndex(indices);geo.computeVertexNormals();return geo;
+}
+const cragGeo=coastalCragGeometry();
+const shared=new Set([boxGeo,stoneGeo,roofGeo,leafGeo,trunkGeo,coneGeo,roundGeo,cragGeo]);
 function add(g,geo,color,x,y,z,sx=1,sy=1,sz=1){const m=new THREE.Mesh(geo,material(color));m.position.set(x,y,z);m.scale.set(sx,sy,sz);m.castShadow=m.receiveShadow=true;g.add(m);return m;}
 const box=(g,c,x,y,z,sx,sy,sz)=>add(g,boxGeo,c,x,y,z,sx,sy,sz);
 export function releaseDetail(group){group.removeFromParent();const geos=new Set();group.traverse(o=>{if(o.geometry&&!shared.has(o.geometry))geos.add(o.geometry);});geos.forEach(g=>g.dispose());group.clear();}
@@ -45,8 +57,8 @@ export function buildingTypeFor(regionId,slot){
 const shade=(color,multiplier)=>new THREE.Color(color).multiplyScalar(multiplier).getHex();
 function house(g,r,x,y,z,slot,detail){
  const type=buildingTypeFor(r.id,slot),{w,d,h}=type,raised=type.id==='stilt'?1.8:type.id==='cliffhouse'?1.15:0;
- const roofColor=slot%7===0?shade(r.roof,.69):slot%4===0?shade(r.roof,1.21):r.roof;
- const skin=[0xe9d6b2,0xc8bc9f,0xe7c6a0,0xd8d1bc][slot%4],timber=slot%3===0?0x704d35:0x916847;
+ const roofColor=r.id==='harbor'?[0xbf613f,0x537d77,0xd48151,0x8a514b,0x718c83,0xb97449,0x68545a][((slot%7)+7)%7]:slot%7===0?shade(r.roof,.69):slot%4===0?shade(r.roof,1.21):r.roof;
+ const skin=r.id==='harbor'?[0xe9d6b2,0xe6c5a0,0xc6b6a1,0xe8d6ba,0x9eb5ac][((slot%5)+5)%5]:[0xe9d6b2,0xc8bc9f,0xe7c6a0,0xd8d1bc][slot%4],timber=slot%3===0?0x704d35:0x916847;
  const baseY=y+raised,top=baseY+h+.5,halfD=d/2,halfW=w/2;
  // Silhouette and roof survive as low-detail village landmarks.
  if(type.id==='lighthouse'){
@@ -128,6 +140,16 @@ function house(g,r,x,y,z,slot,detail){
    for(let i=-2;i<=2;i++)box(g,timber,x+i*w*.21+.55,baseY+h*.84,z+halfD+2.02,.10,h*.43,.10);
    break;
  }
+ if(r.id==='harbor'&&type.id!=='lighthouse'){
+  // Canvas shade, shutters and flower boxes keep the seaside facade readable
+  // even when the small houses are viewed from a ship rather than overhead.
+  const awning=box(g,slot%2?0x6c9b91:0xcf8265,x,baseY+2.18,z+halfD+1.12,w*.74,.12,1.55);awning.rotation.x=-.12;
+  for(const side of [-1,1]){
+   box(g,slot%2?0x5c857b:0xb86f55,x+side*.95,baseY+h*.61,z+halfD+.28,.16,.96,.10);
+   box(g,0x947049,x+side*.92,baseY+h*.33,z+halfD+.31,.72,.18,.36);
+   for(let k=0;k<3;k++)add(g,leafGeo,k%2?0x6b985f:0x8bb276,x+side*.92+(k-1)*.20,baseY+h*.38,z+halfD+.36,.24,.32,.25);
+  }
+ }
  return type;
 }
 function sideOffset(i,w){return (i-1.5)*w*.23;}
@@ -136,13 +158,15 @@ export function villageSlots(r,rows=3){
  const slots=[];
  for(let row=0;row<rows;row++)for(let j=-3;j<=3;j++){
   const slot=row*7+j+3,seed=slot*12.9898+offset*78.233;
-  const radius=153+row*6+Math.sin(seed)*.65;
-  const tangent=j*5.55+Math.cos(seed*1.37)*.8;
-  slots.push({slot,x:u.x*radius+v.x*tangent,z:u.z*radius+v.z*tangent,y:5.25,heading:-r.angle+Math.PI/2+Math.sin(seed*.71)*.21});
+  const harbor=r.id==='harbor';
+  const radius=harbor?152+row*5.15+Math.sin(seed*.81)*1.45:153+row*6+Math.sin(seed)*.65;
+  const tangent=harbor?j*5.15+Math.cos(seed*1.37)*1.15+(row%2?2.1:-.8):j*5.55+Math.cos(seed*1.37)*.8;
+  slots.push({slot,x:u.x*radius+v.x*tangent,z:u.z*radius+v.z*tangent,y:5.25,heading:-r.angle+(harbor?-Math.PI/2:Math.PI/2)+Math.sin(seed*.71)*(harbor?.38:.21)+(harbor&&slot%6===0?.28:0)});
  }
  return slots;
 }
 function tree(g,x,y,z,seed,r,central=false){
+ if(r.id==='harbor'){harborPlant(g,x,y,z,seed,central);return;}
  const tall=central?6+(seed%4)*.75:3.7+(seed%3)*.7;
  const trunk=add(g,trunkGeo,0x76543b,x,y+tall*.5,z,central?.52:.32,tall,central?.52:.32);
  trunk.rotation.z=(seed%3-1)*.045;
@@ -159,6 +183,38 @@ function tree(g,x,y,z,seed,r,central=false){
   for(let k=0;k<6;k++){const angle=k*Math.PI/3+seed*.13;const leaf=add(g,leafGeo,r.grass,x+Math.cos(angle)*1.05,y+tall+.1+Math.sin(k*2)*.16,z+Math.sin(angle)*1.05,1.55,.32,.58);leaf.rotation.y=-angle;leaf.rotation.z=Math.cos(angle)*.18;}
  }
 }
+function harborPlant(g,x,y,z,seed,central=false){
+ const kind=central?seed%3:seed%5,tint=[0x4b8264,0x6fa967,0x85ae64,0x456f5a][seed%4];
+ if(kind===0){ // Wind-bent palms with individually splayed fronds and coconuts.
+  const height=central?7.6:5.3+(seed%3)*.52;
+  for(let i=0;i<3;i++){const trunk=add(g,trunkGeo,0x856447,x+i*.13,y+(i+.5)*height/3,z-i*.08,.25-i*.025,height/3+.15,.25-i*.025);trunk.rotation.z=-.09;}
+  for(let i=0;i<8;i++){
+   const a=i*Math.PI/4+seed*.31,reach=central?3.35:2.6,dx=Math.cos(a),dz=Math.sin(a);
+   const leaf=add(g,leafGeo,i%3===0?0x91bc6a:tint,x+dx*reach*.52,y+height+.05+Math.sin(i*2.2)*.16,z+dz*reach*.52,reach*.55,.15,reach*.22);
+   leaf.rotation.y=-a;leaf.rotation.z=-.20+Math.sin(i*1.6)*.08;
+   add(g,leafGeo,shade(tint,.76),x+dx*reach*.89,y+height-.32,z+dz*reach*.89,.42,.12,.42);
+  }
+  for(let i=0;i<3;i++)add(g,leafGeo,0x76683c,x+Math.cos(i*2.1)*.33,y+height-.25,z+Math.sin(i*2.1)*.33,.24,.25,.24);
+ }else if(kind===1){ // Rounded tropical broadleaf trees, with uneven canopy volumes.
+  const height=central?7.5:4.5+(seed%3)*.55;
+  add(g,trunkGeo,0x715342,x,y+height*.5,z,.33,height,.33);
+  for(let i=0;i<5;i++){const a=i*2.399+seed*.27,spread=central?2.1:1.35;
+   add(g,leafGeo,i%2?shade(tint,.83):tint,x+Math.cos(a)*spread,y+height+(i%2)*.40,z+Math.sin(a)*spread,central?2.1:1.35,central?1.65:1.12,central?1.9:1.25);
+  }
+ }else if(kind===2){ // Low mangrove with raised roots and a wide crown.
+  const height=central?5.6:3.6;
+  for(let i=0;i<4;i++){const a=i*Math.PI*.5+seed*.2,root=add(g,trunkGeo,0x70513d,x+Math.cos(a)*.42,y+.75,z+Math.sin(a)*.42,.12,1.6,.12);root.rotation.z=Math.cos(a)*.38;}
+  add(g,trunkGeo,0x775740,x,y+height*.5,z,.39,height,.39);
+  for(let i=0;i<5;i++){const a=i*2.399+seed*.18;add(g,leafGeo,i%2?0x3f7655:0x609560,x+Math.cos(a)*1.6,y+height+.1+(i%2)*.28,z+Math.sin(a)*1.45,1.7,.72,1.55);}
+ }else if(kind===3){ // Fan-leaf banana plants.
+  const height=3.1+(seed%2)*.5;
+  add(g,trunkGeo,0x66854a,x,y+height*.45,z,.22,height*.9,.22);
+  for(let i=0;i<6;i++){const a=i*Math.PI/3+seed*.39,dx=Math.cos(a),dz=Math.sin(a);const leaf=add(g,leafGeo,i%2?0x73a765:0xa0bc6b,x+dx*1.1,y+height+.18,z+dz*1.1,1.5,.22,.5);leaf.rotation.y=-a;leaf.rotation.z=.26;}
+ }else{ // Spiky coastal agave with small warm flowers.
+  for(let i=0;i<7;i++){const a=i*2.399+seed*.21,leaf=add(g,coneGeo,i%2?0x638f70:0x9ebc74,x+Math.cos(a)*.48,y+.70,z+Math.sin(a)*.48,.33,1.5,.33);leaf.rotation.z=Math.cos(a)*.47;}
+  for(let i=0;i<3;i++)add(g,leafGeo,i%2?0xe2ad70:0xda8d83,x+Math.cos(i*2.1)*.35,y+1.42,z+Math.sin(i*2.1)*.35,.22,.18,.22);
+ }
+}
 function addTerrace(g,t,r,i){
  const a=t.seed*2.41+i*2.31,outer=i===0?.20:.34;
  const cx=t.x+Math.cos(a)*t.rx*outer,cz=t.z+Math.sin(a)*t.rz*outer;
@@ -169,7 +225,10 @@ function addTerrace(g,t,r,i){
   const x=Math.cos(angle)*rx*rad,z=Math.sin(angle)*rz*rad;pos.push(x,rings[k][0],z);
   if(k===rings.length-1)outline.push(new THREE.Vector2(x,-z));
  }
- for(let k=0;k<rings.length-1;k++)for(let j=0;j<n;j++){const p=k*n+j,q=k*n+(j+1)%n;idx.push(p,q,p+n,q,q+n,p+n);}
+ // The rocky shelf is seen from outside. Keep its triangles outward-facing;
+ // inward winding made the wall vanish under FrontSide culling, leaving trees
+ // and the upper grassy cap looking suspended from a low camera angle.
+ for(let k=0;k<rings.length-1;k++)for(let j=0;j<n;j++){const p=k*n+j,q=k*n+(j+1)%n;idx.push(p,p+n,q,q,p+n,q+n);}
  const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));geo.setIndex(idx);geo.computeVertexNormals();
  const rock=new THREE.Mesh(geo,material(shade(r.rock,i===0?.91:1.05)));rock.position.set(cx,0,cz);rock.castShadow=rock.receiveShadow=true;g.add(rock);
  const cap=new THREE.Mesh(new THREE.ShapeGeometry(new THREE.Shape(outline)),material(i%2?shade(r.grass,1.13):r.grass));cap.rotation.x=-Math.PI/2;cap.position.set(cx,t.h+rise+.035,cz);cap.castShadow=cap.receiveShadow=true;g.add(cap);
@@ -215,15 +274,18 @@ function addRegionalLandmark(g,t,r){
 export function createTerrainBase(t){
  const g=new THREE.Group(),r=REGIONS.find(r=>r.id===t.region);g.name=`${r.name} cliff ${t.seed}`;
  // A single shared contour through every stratum prevents the offset, rotated-column look.
- const n=24,phase=t.seed*1.73,rings=[[-1.25,1.10],[.15,1.015],[t.h*.20,.99],[t.h*.40,.91],[t.h*.61,.94],[t.h*.82,.855],[t.h-.15,.79],[t.h,.77]];
+ const harbor=r.id==='harbor',n=harbor?48:24,phase=t.seed*1.73;
+ const rings=harbor?[[-1.35,1.06],[-.28,1.015],[.18,.97],[t.h*.14,.95],[t.h*.28,.90],[t.h*.43,.88],[t.h*.55,.90],[t.h*.70,.84],[t.h*.84,.83],[t.h-.18,.79],[t.h,.785]]:[[-1.25,1.10],[.15,1.015],[t.h*.20,.99],[t.h*.40,.91],[t.h*.61,.94],[t.h*.82,.855],[t.h-.15,.79],[t.h,.77]];
  const positions=[],colors=[],indices=[],coast=[];
- const rockColor=new THREE.Color(r.rock),sandColor=new THREE.Color(r.id==='reef'?0xe2d6aa:0xd5c39e);
+ const rockColor=new THREE.Color(r.rock),sandColor=new THREE.Color(r.id==='reef'?0xe2d6aa:0xd5c39e),harborOchre=new THREE.Color(0xc9ad84);
  for(let k=0;k<rings.length;k++)for(let j=0;j<n;j++){
-  const a=j/n*Math.PI*2,rough=t.h>8?1.7:1,ir=1+rough*(.055*Math.sin(a*3+phase)+.037*Math.cos(a*5-phase*.7)+.023*Math.sin(a*9+phase*.4));
-  const radius=rings[k][1]*ir*(1+.012*Math.sin(k*3+a*4+phase));
-  const x=Math.cos(a)*t.rx*radius,z=Math.sin(a)*t.rz*radius,y=rings[k][0]+(k>1&&k<rings.length-2?.16*Math.sin(a*7+phase+k):0);
+  const a=j/n*Math.PI*2,rough=t.h>8?1.7:1;
+  const ir=harbor?.92+.068*Math.sin(a*3+phase)+.037*Math.cos(a*5-phase*.7)+.023*Math.sin(a*9+phase*.4)+.013*Math.cos(a*13-phase*.9):1+rough*(.055*Math.sin(a*3+phase)+.037*Math.cos(a*5-phase*.7)+.023*Math.sin(a*9+phase*.4));
+  const radius=rings[k][1]*ir*(1+(harbor?.034:.012)*Math.sin(k*3+a*4+phase));
+  const x=Math.cos(a)*t.rx*radius,z=Math.sin(a)*t.rz*radius,y=rings[k][0]+(k>1&&k<rings.length-2?(harbor?.28:.16)*Math.sin(a*7+phase+k):0);
   positions.push(x,y,z);
-  const c=(k<2?sandColor:rockColor).clone().multiplyScalar(k<2?1:.80+((k+1)%3)*.075+.07*Math.sin(a*6+phase));colors.push(c.r,c.g,c.b);
+  const source=harbor&&k>1&&k<5?harborOchre:k<2?sandColor:rockColor;
+  const c=source.clone().multiplyScalar(k<2?1:harbor?.79+((k+1)%4)*.056+.07*Math.sin(a*5+phase):.80+((k+1)%3)*.075+.07*Math.sin(a*6+phase));colors.push(c.r,c.g,c.b);
   if(k===rings.length-1)coast.push(new THREE.Vector2(x,-z));
  }
  for(let k=0;k<rings.length-1;k++)for(let j=0;j<n;j++){const a=k*n+j,b=k*n+(j+1)%n;indices.push(a,b,a+n,b,b+n,a+n);}
@@ -255,14 +317,174 @@ export function createTerrainBase(t){
    const b=add(g,leafGeo,i%3?shade(r.rock,1.16):0xd8c89b,x,t.h*.22,z,1.4+(i%3)*.45,.76+(i%2)*.25,1.1+(i%2)*.4);b.rotation.y=a;
   }
  }
+ if(harbor){
+  // Jagged sandstone shoulders and detached shelf stones remain inside the
+  // existing island collider, so the more intricate coast stays navigable.
+  for(let i=0;i<(t.seed===51?16:12);i++){
+   const a=i*2.399+phase,rad=.68+(i%4)*.054,mid=i%3===0;
+   const x=t.x+Math.cos(a)*t.rx*rad,z=t.z+Math.sin(a)*t.rz*rad;
+   const size=(t.seed===51?1.4:1.0)*(1+(i%4)*.22);
+   const rock=add(g,cragGeo,i%4===0?0xdac399:i%3===0?0x967b61:0xb69b78,x,mid?t.h*.39:.42,z,size*1.05,mid?Math.max(1.4,t.h*.20):.85+(i%3)*.28,size*.82);
+   rock.rotation.y=a*.56;rock.rotation.z=(i%3-1)*.08;
+  }
+  if(t.h>12)for(let i=0;i<5;i++){
+   const a=i*2.399+phase*.31,rad=.30+(i%2)*.13;
+   const rock=add(g,cragGeo,i%2?0xb19979:0xc8b18c,t.x+Math.cos(a)*t.rx*rad,t.h+2.0+(i%3)*.65,t.z+Math.sin(a)*t.rz*rad,2.7+(i%2)*.5,3.9+(i%3)*1.2,1.9+(i%2)*.5);
+   rock.rotation.y=a;
+  }
+ }
  addRegionalLandmark(g,t,r);
+ return g;
+}
+function createHarborPort(r){
+ const port=new THREE.Group();port.name='Warm Sand Harbor waterfront';
+ port.position.set(r.dock.x,0,r.dock.z);port.rotation.y=Math.PI/2-r.angle;
+ const wood=0x9b7049,edge=0x674c38;
+ // A cross quay, two working slips and uneven board planks give the harbor a
+ // real shoreline footprint instead of a single bare rectangle.
+ box(port,wood,0,1.18,5,4.7,.27,22);
+ for(let i=0;i<25;i++)box(port,i%4===0?0xbe9060:0xa67b50,0,1.35,-5.5+i*.82,4.42,.07,.68);
+ box(port,wood,0,1.28,6,31,.25,4.25);
+ for(let i=0;i<35;i++)box(port,i%5===0?0xc19560:0xa77c50,-14.8+i*.87,1.46,6,.70,.06,4.08);
+ for(const side of [-1,1]){
+  box(port,wood,side*12,1.22,4,3.2,.24,14);
+  for(let i=0;i<16;i++)box(port,i%3===0?0xb88959:0x987048,side*12,1.39,-2.5+i*.85,3.02,.055,.69);
+  box(port,0xb38b5e,side*12,1.53,9,8,.22,7);
+  for(let i=0;i<4;i++)for(const s of [-1,1])box(port,edge,side*12+s*3.5,.1,5+i*2, .24,2.5,.24);
+ }
+ for(let i=-4;i<=4;i++)for(const s of [-1,1]){
+  box(port,edge,s*2.16,.08,i*2.35+4,.25,2.5,.25);
+  if(i%2===0){box(port,0x775640,s*2.16,2.0,i*2.35+4,.12,1.8,.12);add(port,leafGeo,0xefc77c,s*2.16,2.85,i*2.35+4,.27,.38,.27);}
+ }
+ // Different roof silhouettes and low stilt construction frame the dock.
+ for(const [x,z,slot] of [[-12,9,6],[12,9,3],[-18,10,1]]){
+  const building=new THREE.Group();house(building,r,0,1.65,0,slot,true);building.position.set(x,0,z);building.rotation.y=Math.PI+(x<0?-.10:.14);port.add(building);
+ }
+ // Tavern banner, hanging signs, fishing gear and warm cargo colours.
+ box(port,0x5d4036,-11.7,6.55,4.9,3.4,.92,.16);
+ box(port,0xe0ba72,-11.7,6.55,4.79,2.9,.59,.08);
+ for(const s of [-1,1]){add(port,roundGeo,0xe4be75,-11.7+s*.85,6.55,4.68,.27,.1,.27);box(port,edge,-11.7+s*1.78,6.55,4.9,.12,1.1,.13);}
+ for(let i=0;i<16;i++){
+  const x=(i%2?1:-1)*(4+(i%4)*1.25),z=3+(i%5)*1.5;
+  if(i%3===0)add(port,stoneGeo,0xb48256,x,1.94,z,.42,.78,.42);
+  else box(port,i%4===0?0x637d78:0xa47952,x,1.80,z,.72,.64,.72);
+ }
+ for(let i=0;i<15;i++){
+  const stair=box(port,i%3===0?0xd7b58b:0xc7a67c,4.8,1.68+i*.27,5.7+i*.55,3.2,.36,.64);
+  stair.rotation.y=Math.sin(i*.58)*.045;
+  if(i%4===0)add(port,cragGeo,0xa78d6b,7.35,2+i*.27,5.7+i*.55,.62,.5,.54);
+ }
+ for(let i=0;i<4;i++){const x=i%2?-15:16,z=10+(i>>1)*2;
+  add(port,stoneGeo,0xb78358,x,1.89,z,.56,.72,.56);
+  harborPlant(port,x,2.27,z,3+i,false);
+ }
+ // A small moored workboat makes the quay legible from the sailing camera.
+ const skiff=add(port,leafGeo,0x5e4033,17,.20,-4,2.5,.38,1.05);skiff.rotation.y=-.24;
+ box(port,0xc59664,17,.52,-4,1.12,.12,.65);
+ box(port,edge,17,1.9,-4,.10,2.9,.10);
+ const sail=add(port,roofGeo,0xe4d8ad,17.5,2.45,-4,1.1,1.4,.08);sail.rotation.y=-.22;
+ consolidateChunk(port);
+ return port;
+}
+function createHarborSkyhouse(mainlandSeed,isletSeed){
+ const mainland=TERRAIN.find(t=>t.region==='harbor'&&t.seed===mainlandSeed),islet=TERRAIN.find(t=>t.region==='harbor'&&t.seed===isletSeed);
+ const dx=islet.x-mainland.x,dz=islet.z-mainland.z,span=Math.hypot(dx,dz);
+ const g=new THREE.Group();g.name=`暖沙港 · ${isletSeed===0?'西側':'東側'}空中橋屋`;
+ g.position.set((mainland.x+islet.x)/2,0,(mainland.z+islet.z)/2);
+ g.rotation.y=-Math.atan2(dz,dx);
+ const dark=0x6c4b36,wood=0x9b704a,light=0xc59a63,plaster=0xe6c9a5,teal=0x4e8e8c,coral=0xc97d58,roofColor=isletSeed===0?0xb86649:0x557c76;
+ const beam=(color,a,b,width=.12,depth=width)=>{
+  const from=new THREE.Vector3(...a),to=new THREE.Vector3(...b),middle=from.clone().add(to).multiplyScalar(.5);
+  const m=box(g,color,middle.x,middle.y,middle.z,width,from.distanceTo(to),depth);
+  m.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),to.sub(from).normalize());return m;
+ };
+ // The deck spans the actual water gap. Only the outer ends are braced into
+ // rock; nothing reaches sea level in the channel beneath the house.
+ const deckLength=span-12;
+ box(g,dark,0,19.15,0,deckLength,.42,5.5);
+ for(let i=0;i<Math.floor(deckLength/.7);i++){
+  const x=-deckLength/2+.42+i*.7;
+  box(g,i%5===0?light:wood,x,19.40,0,.56,.10,5.38);
+ }
+ for(const side of [-1,1]){
+  box(g,dark,0,18.84,side*2.57,deckLength,.24,.22);
+  for(let x=-deckLength/2+.65;x<deckLength/2;x+=2.3){
+   box(g,dark,x,20.23,side*2.51,.13,1.65,.13);
+   if(Math.abs(x)>7.8)box(g,light,x,20.77,side*2.52,.24,.16,.25);
+  }
+  box(g,light,0,21.01,side*2.52,deckLength,.13,.14);
+  box(g,wood,0,20.23,side*2.52,deckLength,.07,.10);
+ }
+ for(const side of [-1,1]){
+  const end=side*deckLength/2;
+  box(g,dark,end,18.25,0,.40,2.9,5.7);
+  for(const z of [-2.3,2.3]){
+   const shoreHeight=(side>0?islet.h:mainland.h)+.15;
+   beam(dark,[end-side*6.8,18.93,z],[end,shoreHeight,z],.29,.29);
+   beam(light,[end-side*4.4,19.0,z],[end,shoreHeight+.25,z],.12,.12);
+  }
+ }
+ // A hand-built bridge house: layered roof, sea-facing shutters, balconies,
+ // carved timber framing, awnings, warm windows and hanging lamps.
+ box(g,dark,0,19.66,0,13.5,.35,6.1);
+ box(g,plaster,0,21.60,0,11.7,3.65,5.9);
+ for(const x of [-5.8,5.8])for(const z of [-2.93,2.93])box(g,dark,x,21.62,z,.19,3.88,.19);
+ for(const side of [-1,1]){
+  box(g,dark,0,23.50,side*3.02,12.1,.17,.18);
+  box(g,light,0,19.86,side*3.04,12.3,.16,.18);
+  for(const x of [-3.65,0,3.65]){
+   box(g,dark,x,21.83,side*3.05,1.53,1.52,.15);
+   box(g,0x75adb1,x,21.83,side*3.16,1.18,1.17,.10);
+   box(g,light,x,21.83,side*3.23,.10,1.26,.12);
+   box(g,light,x,21.83,side*3.23,1.27,.10,.12);
+   for(const s of [-1,1])box(g,teal,x+s*.88,21.83,side*3.19,.22,1.5,.12);
+   box(g,wood,x,21.02,side*3.28,1.63,.16,.43);
+   for(let k=-1;k<=1;k++)add(g,leafGeo,k===0?0xda9b77:0x6d9b68,x+k*.43,21.20,side*3.33,.30,.28,.31);
+  }
+  const awning=box(g,side>0?coral:teal,0,23.35,side*3.71,10.2,.15,1.75);awning.rotation.x=side*.13;
+  for(let k=-4;k<=4;k++)box(g,k%2?0xe9d0a5:side>0?0xa85f4c:0x3a7777,k*1.12,23.41,side*3.76,.16,.07,1.75);
+  for(const x of [-5.2,5.2]){
+   beam(dark,[x,22.9,side*3.0],[x,23.4,side*4.45],.10,.10);
+   box(g,0xeac679,x,22.56,side*4.25,.42,.54,.42);
+  }
+ }
+ for(const end of [-1,1]){
+  box(g,dark,end*5.97,21.36,0,.15,2.35,1.22);
+  box(g,teal,end*6.08,21.36,0,.11,2.08,.96);
+  for(const z of [-2.35,2.35])beam(light,[end*6.1,19.6,z],[end*8.1,21.0,z],.12,.12);
+ }
+ const roof=add(g,roofGeo,roofColor,0,24.25,0,3.95,1.85,7.4);roof.rotation.y=Math.PI/2;
+ box(g,0xe4ac71,0,26.08,0,14.8,.15,.18);
+ for(let i=0;i<10;i++){
+  const x=-6.3+i*1.4;
+  for(const side of [-1,1]){
+   const rib=box(g,i%2?shade(roofColor,.80):shade(roofColor,1.12),x,24.58,side*2.10,.08,.07,3.0);
+   rib.rotation.x=side*.46;
+  }
+ }
+ for(const side of [-1,1])for(const x of [-3.25,3.25]){
+  box(g,plaster,x,25.08,side*2.15,1.50,1.20,.82);
+  box(g,dark,x,25.06,side*2.61,.97,.83,.13);
+  box(g,0x86b8b9,x,25.06,side*2.71,.72,.60,.08);
+  box(g,light,x,25.06,side*2.77,.09,.70,.09);
+  const dormer=add(g,roofGeo,shade(roofColor,.85),x,25.83,side*2.15,.95,.66,.70);dormer.rotation.y=Math.PI/2;
+ }
+ box(g,0xc19b75,4.85,26.30,-.9,.70,2.15,.70);
+ box(g,dark,4.85,27.44,-.9,.96,.18,.94);
+ box(g,dark,0,21.83,-4.55,3.35,1.18,.16);
+ box(g,0xf0d6a1,0,21.83,-4.64,2.96,.85,.08);
+ for(const x of [-1.04,0,1.04])add(g,leafGeo,0x648b77,x,21.84,-4.72,.20,.28,.11);
+ consolidateChunk(g);
  return g;
 }
 export function createVillageBase(r){
  const g=new THREE.Group();g.name=r.village;const homes=new THREE.Group();g.add(homes);g.userData.homes=homes;const u={x:Math.cos(r.angle),z:Math.sin(r.angle)},v={x:-u.z,z:u.x};
  for(const s of villageSlots(r,2)){const h=new THREE.Group();house(h,r,0,s.y,0,s.slot,false);h.position.set(s.x,0,s.z);h.rotation.y=s.heading;homes.add(h);}
- const dock=box(g,0xb38b58,u.x*140,1.1,u.z*140,5,.5,18);dock.rotation.y=-r.angle+Math.PI/2;
- for(let k=0;k<5;k++)for(const s of [-1,1])box(g,0x70533d,u.x*(133+k*3)+v.x*s*2.1,.25,u.z*(133+k*3)+v.z*s*2.1,.3,2.5,.3);
+ if(r.id==='harbor')g.add(createHarborPort(r),createHarborSkyhouse(1,0),createHarborSkyhouse(3,4));
+ else{
+  const dock=box(g,0xb38b58,u.x*140,1.1,u.z*140,5,.5,18);dock.rotation.y=-r.angle+Math.PI/2;
+  for(let k=0;k<5;k++)for(const s of [-1,1])box(g,0x70533d,u.x*(133+k*3)+v.x*s*2.1,.25,u.z*(133+k*3)+v.z*s*2.1,.3,2.5,.3);
+ }
  for(let k=0;k<13;k++){const r0=143+k*.83,stair=box(g,0xc8aa7c,u.x*r0,1.3+k*.34,u.z*r0,4,.45,.9);stair.rotation.y=-r.angle+Math.PI/2;}
  consolidateChunk(homes);instanceKit(g);return g;
 }
@@ -272,12 +494,19 @@ export function* detailsForRegion(r){
   const g=new THREE.Group();house(g,r,0,s.y,0,s.slot,true);g.position.set(s.x,0,s.z);g.rotation.y=s.heading;instanceKit(g);yield g;
  }
  for(const t of TERRAIN.filter(t=>t.region===r.id)){
-  for(let i=0;i<(t.seed>=51?22:8);i++){
-   const g=new THREE.Group(),central=t.seed>=51,a=central?i*2.399+t.seed:i*2.4+t.seed,rad=central?.14+(i%7)*.067:.3+(i%3)*.12;
+  for(let i=0;i<(t.seed>=51?22:r.id==='harbor'?t.seed===0?14:12:8);i++){
+   const g=new THREE.Group(),central=t.seed>=51,a=central?i*2.399+t.seed:i*2.4+t.seed;
+   const rad=central?.14+(i%7)*.067:r.id==='harbor'?(t.seed===0?.57+(i%3)*.065:.24+(i%4)*.115):.3+(i%3)*.12;
    tree(g,t.x+Math.cos(a)*t.rx*rad,t.h+.6,t.z+Math.sin(a)*t.rz*rad,i,r,central);
    // Vertical flank facets and low shoreline boulders, never protruding into the collision corridor.
    for(let k=0;k<4;k++){const b=add(g,stoneGeo,k%2?r.rock:new THREE.Color(r.rock).multiplyScalar(.84).getHex(),t.x+Math.cos(a)*t.rx*(.73-k*.05),t.h*(.12+k*.21),t.z+Math.sin(a)*t.rz*(.73-k*.05),(t.seed>=51?Math.min(t.rx,t.rz)*.21:t.rx*.28),t.h*.19,(t.seed>=51?Math.min(t.rx,t.rz)*.21:t.rz*.24));b.rotation.y=t.seed>=51?0:a+k*.11;}
    const shore=add(g,leafGeo,r.rock,t.x+Math.cos(a)*t.rx*.92,.15,t.z+Math.sin(a)*t.rz*.92,1.6,1.0,1.2);shore.rotation.y=a;
+   if(r.id==='harbor'&&t.h>10&&i%3===0){
+    const ledgeY=t.h*(.43+(i%2)*.14),lx=t.x+Math.cos(a)*t.rx*.82,lz=t.z+Math.sin(a)*t.rz*.82;
+    const ledge=add(g,cragGeo,i%2?0xa78d6d:0xc9b38e,lx,ledgeY,lz,2.2,1.35,1.8);ledge.rotation.y=a;
+    harborPlant(g,lx,ledgeY+1.50,lz,i+14,false);
+    for(let leaf=0;leaf<3;leaf++)add(g,leafGeo,leaf%2?0x5c8b5f:0x7aa166,lx+Math.cos(a+leaf*1.3)*1.3,ledgeY+1.43,lz+Math.sin(a+leaf*1.3)*1.3,.72,.33,.62);
+   }
    if(r.id==='reef')for(let branch=0;branch<4;branch++){const xx=t.x+Math.cos(a)*t.rx*.98+branch*.4,zz=t.z+Math.sin(a)*t.rz*.98;const coral=add(g,stoneGeo,branch%2?0xdf987f:0x92c0ac,xx,.35,zz,.12,.9+branch*.15,.12);coral.rotation.z=(branch-1.5)*.25;add(g,leafGeo,0xe9c8a0,xx,.9,zz,.3,.16,.3);}
    instanceKit(g);yield g;
   }
@@ -303,6 +532,12 @@ export function* detailsForRegion(r){
     for(let k=0;k<3;k++)add(scatter,leafGeo,green,x+Math.sin(a+k*2.1)*.48,t.h+.32,z+Math.cos(a+k*2.1)*.48,.66+(k%2)*.2,.42,.59);
    }
    if(i%3===0){const b=add(scatter,leafGeo,shade(r.rock,1.2),x+Math.sin(a)*1.15,t.h+.29,z-Math.cos(a)*1.15,.62,.42,.78);b.rotation.y=a;}
+   if(r.id==='harbor'&&i%2===0){
+    for(let k=0;k<4;k++){const da=a+k*1.57;
+     const blade=add(scatter,coneGeo,k%2?0x4c855d:0xa2bd73,x+Math.cos(da)*.45,t.h+.58,z+Math.sin(da)*.45,.23,1.05,.23);blade.rotation.z=Math.cos(da)*.36;
+    }
+    for(let k=0;k<3;k++)add(scatter,leafGeo,k%2?0xe6b673:0xd98272,x+Math.sin(a+k*2)*.44,t.h+.87,z+Math.cos(a+k*2)*.44,.16,.15,.16);
+   }
   }
   if(r.id==='reef')for(let i=0;i<8;i++){
    const a=i*2.399+t.seed,rad=.83;
@@ -310,9 +545,42 @@ export function* detailsForRegion(r){
    for(let j=0;j<3;j++){const branch=add(scatter,stoneGeo,j%2?0xe1987c:0xf0bd91,x+(j-1)*.25,.55+j*.10,z,.09,1.15+j*.21,.10);branch.rotation.z=(j-1)*.28;}
   }
   instanceKit(scatter);yield scatter;
+  if(r.id==='harbor'&&t.h>10){
+   const ledges=new THREE.Group();
+   for(let i=0;i<17;i++){
+    const angle=i*2.399+t.seed*.47,height=t.h*(.20+(i%4)*.155),rad=.83+(i%3)*.016;
+    const x=t.x+Math.cos(angle)*t.rx*rad,z=t.z+Math.sin(angle)*t.rz*rad;
+    const rock=add(ledges,cragGeo,i%5===0?0xd8be94:i%2?0x967d62:0xb19a79,x,height,z,1.35+(i%3)*.42,.77+(i%3)*.22,1.25+(i%2)*.34);
+    rock.rotation.y=angle*.61;
+    for(let j=0;j<3;j++){
+     const leaf=add(ledges,leafGeo,j%2?0x4d815b:0x79a369,x+Math.cos(angle+j*1.4)*.65,height+.78+(j%2)*.16,z+Math.sin(angle+j*1.4)*.65,.72+(j%2)*.28,.35,.71);
+     leaf.rotation.y=angle+j*.4;
+    }
+    if(i%4===0){
+     for(let vine=0;vine<3;vine++)add(ledges,leafGeo,vine%2?0x437856:0x729b60,x+Math.cos(angle)*.8,height-.25-vine*.48,z+Math.sin(angle)*.8,.35,.48,.28);
+    }
+   }
+   instanceKit(ledges);yield ledges;
+   if(t.seed!==51){
+    // Wide seaward shelves are composed toward the sailing route. Each shelf
+    // has rock beneath it, a thin planted cap and a different tree silhouette.
+    const face=new THREE.Group(),front=r.angle+Math.PI;
+    for(let i=0;i<7;i++){
+     const a=front+(i-3)*.23+.045*Math.sin(i*2.9+t.seed),rad=.81+(i%2)*.025;
+     const x=t.x+Math.cos(a)*t.rx*rad,z=t.z+Math.sin(a)*t.rz*rad;
+     const y=t.h*(.29+(i%3)*.16),scale=2.7+(i%3)*.35;
+     const shelf=add(face,cragGeo,i%3===0?0xb39a79:0x9d866c,x,y,z,scale,1.1+(i%2)*.22,scale*.83);shelf.rotation.y=a;
+     const greenery=add(face,leafGeo,i%2?0x6f9b67:0x8cab70,x,y+1.37,z,scale*.98,.20,scale*.72);greenery.rotation.y=a;
+     harborPlant(face,x,y+1.46,z,i%3===0?i+1:i+15,false);
+     for(let k=0;k<3;k++)add(face,leafGeo,k%2?0x4f8259:0x88a968,x+Math.cos(a+k*1.4)*1.65,y+1.5,z+Math.sin(a+k*1.4)*1.35,.75,.5,.69);
+    }
+    instanceKit(face);yield face;
+   }
+  }
  }
  // Two tiny inhabited shore hamlets accompany each region's central repair village.
  for(const side of [-1,1])for(let j=0;j<4;j++){
+  if(r.id==='harbor')continue; // Both inlet hamlets become open-water skybridge houses.
   const g=new THREE.Group(),a=r.angle+side*.29,p={x:Math.cos(a)*(162+j*.8),z:Math.sin(a)*(162+j*.8)};
   house(g,r,0,3.5+j*.35,0,100+(side+1)*4+j,true);g.position.set(p.x+Math.sin(a)*j*4,0,p.z-Math.cos(a)*j*4);g.rotation.y=-a+Math.PI/2+Math.sin(j*3.1+side)*.16;instanceKit(g);yield g;
  }
