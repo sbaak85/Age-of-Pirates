@@ -11,8 +11,8 @@ async function ready(){
   catch{return false;}
 }
 
-if(!existsSync(join(root,'node_modules','three','build','three.module.js'))){
-  console.error('Three.js is missing. Run npm install in the project folder.');
+if(!existsSync(join(root,'vendor','three','build','three.module.js')) || !existsSync(join(root,'vendor','three','build','three.core.js'))){
+  console.error('Bundled Three.js is missing. Restore the vendor/three folder from the game download.');
   process.exitCode=1;
 }else{
   if(!await ready()){

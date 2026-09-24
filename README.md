@@ -10,17 +10,18 @@
 
 ## 啟動
 
-安裝 Node.js 與專案相依套件後，在 Windows 執行 `啟動海戰紀元.cmd`，或執行：
+安裝 Node.js 20 或更新版本後，在 Windows 執行 `啟動海戰紀元.cmd`，或執行：
 
 ```sh
-npm install
 node preview-server.mjs
 ```
 
 - 主遊戲：<http://127.0.0.1:4317/game/>
 - 五區地圖預覽：<http://127.0.0.1:4317/game/archipelago-preview.html>
 
-已有 pnpm 的環境也可使用 `pnpm install --frozen-lockfile` 安裝已鎖定的相依套件。
+遊戲已隨附 Three.js 0.180.0，位於納入 Git 追蹤的 `vendor/three`，包含主遊戲與各預覽頁使用的模組及授權。一般啟動不需要執行 npm／pnpm 安裝，也不需要連網下載套件；本機 HTTP 伺服器仍需要 Node.js。
+
+開發與執行 Node 測試時，先使用 `pnpm install --frozen-lockfile` 安裝已鎖定的相依套件。更新 Three.js 或新增 addon 後，執行 `node scripts/vendor-three.mjs` 更新隨附檔案與雜湊清單，並一起提交至 Git。
 
 ## 測試與文件
 

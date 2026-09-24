@@ -10,7 +10,7 @@ const server = http.createServer(async (req, res) => {
     const requested = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);
     const relative = requested === '/' || requested === '/game/' ? 'game/index.html' : requested === '/ship-preview/' ? 'ship-preview/index.html' : requested.slice(1);
     const filename = path.resolve(root, relative);
-    if (!filename.startsWith(root + path.sep) || !['ship-preview', 'game', 'node_modules'].includes(relative.split('/')[0])) {
+    if (!filename.startsWith(root + path.sep) || !['ship-preview', 'game', 'vendor'].includes(relative.split('/')[0])) {
       res.writeHead(403); res.end('Forbidden'); return;
     }
     const body = await readFile(filename);
