@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>海戰紀元 | Age of Pirates</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/game/style.css">
+  <link rel="stylesheet" href="/game/upgrades.css">
+  <script type="importmap">{"imports":{"three":"/node_modules/three/build/three.module.js","three/addons/":"/node_modules/three/examples/jsm/"}}</script>
+</head>
+<body>
+  <div id="scene" aria-label="海戰紀元 3D 遊戲畫面"></div>
+  <div id="vignette"></div><div id="hurt"></div>
+  <header id="hud" class="hidden">
+    <div class="top-left">
+      <div class="brand"><span>✦</span> 海戰紀元 <small>AGE OF PIRATES</small></div>
+      <div class="health-card"><div class="health-title"><span>暮潮號 · 船體耐久</span><strong id="hp-text">160 / 160</strong></div><div class="bar"><i id="hp-fill"></i></div></div>
+      <div class="status-row"><span id="sail-status">⛵ 張帆</span><span id="speed-status">0.0 節</span><span id="gold-status">☼ 0</span></div>
+    </div>
+    <div class="top-right"><div class="mission-kicker">航海任務 01 / 環礁試航</div><div class="mission-title" id="objective">清除六組目標</div><div class="mission-progress" id="progress">0 / 6 目標　·　0 / 6 寶箱</div><div class="target-name" id="nearest">尋找海域目標</div></div>
+  </header>
+  <div id="side-label" class="hidden"><span id="side-symbol">◀</span><strong id="side-name">左舷</strong><small id="side-mode">自動選側</small></div>
+  <div id="reload-panel" class="hidden"><div class="reload-title"><span>側舷加農砲</span><strong id="reload-text">準備開火</strong></div><div class="bar reload-bar"><i id="reload-fill"></i></div><small id="gun-state">四門就緒 · 依序齊射</small></div>
+  <canvas id="minimap" width="184" height="184" class="hidden" aria-label="海域小地圖"></canvas>
+  <button id="dock-prompt" class="hidden" type="button">停靠港口 <kbd>Enter</kbd> · 船塢補給</button>
+  <div id="toast" role="status" aria-live="polite"></div>
+  <div id="controls-hint" class="hidden">W/S 航行 · A/D 轉舵 · Q/E 選舷 · 空白鍵／滑鼠左鍵 開砲 · F 張帆 · Esc 選單</div>
+  <div id="screen" class="screen">
+    <section id="start-panel" class="panel start-panel">
+      <p class="overline">SINGLE PLAYER · FIRST VOYAGE</p>
+      <h1>海戰紀元<span>AGE OF PIRATES</span></h1>
+      <p class="lead">掌舵穿越環礁，靠船身側舷瞄準，打一輪有份量的加農砲。</p>
+      <div class="features"><span>六組巡弋目標</span><span>四砲依序齊射</span><span>寶箱與船塢升級</span></div>
+      <button id="start-button" class="primary">啟航 <span>→</span></button>
+      <p class="start-controls">手把：左搖桿航行 · 右搖桿選舷 · A 開砲 · Y 張帆／收帆 · Menu 暫停</p>
+      <p class="start-controls">鍵鼠：W/S 航行 · A/D 轉舵 · Q/E 選舷 · 空白鍵／滑鼠左鍵 開砲 · F 張帆</p>
+    </section>
+    <section id="pause-panel" class="panel hidden"><p class="overline">航行暫停</p><h2>船長選單</h2><button id="resume-button" class="primary">繼續航行</button><button id="settings-button">遊戲設定</button><button id="restart-button">重新出航</button><p class="menu-note">任務進度會在重新出航時重置，船塢升級保留。</p></section>
+    <section id="settings-panel" class="panel hidden"><p class="overline">OPTIONS</p><h2>遊戲設定</h2><label class="setting"><span>音效音量 <output id="volume-output">65%</output></span><input id="volume" type="range" min="0" max="100" value="65"></label><label class="setting toggle"><span>鏡頭震動</span><input id="shake" type="checkbox" checked><span class="switch"></span></label><label class="setting toggle"><span>震動回饋</span><input id="rumble" type="checkbox" checked><span class="switch"></span></label><label class="setting toggle"><span>側舷指引線</span><input id="guide" type="checkbox" checked><span class="switch"></span></label><button id="settings-back" class="primary">返回</button></section>
+    <section id="dock-panel" class="panel hidden"><p class="overline">CORALHAVEN SHIPYARD</p><h2>珊瑚灣船塢</h2><p class="dock-desc">帶回寶箱、修補船殼，為下一次航程整備。</p><div class="shop-list"><button data-buy="repair" id="buy-repair"><span>修理船殼</span><small>回復 60 耐久 · 15 金</small></button><button data-buy="hull" id="buy-hull"><span>加固龍骨 <em id="hull-level">0 / 3</em></span><small>耐久上限 +25 · 60 金起</small></button><button data-buy="speed" id="buy-speed"><span>迅航帆裝 <em id="speed-level">0 / 3</em></span><small>航行速度 +8% · 60 金起</small></button><button data-buy="cannon" id="buy-cannon"><span>精鑄加農砲 <em id="cannon-level">0 / 3</em></span><small>每發傷害 +4 · 80 金起</small></button></div><p class="dock-money" id="dock-money">持有 0 金</p><button id="dock-back" class="primary">離開船塢</button></section>
+    <section id="result-panel" class="panel hidden"><p class="overline" id="result-kicker">VOYAGE COMPLETE</p><h2 id="result-title">航程完成</h2><p id="result-description">六組目標已清除，寶箱已帶回珊瑚灣。</p><div id="result-stats"></div><button id="result-restart" class="primary">再次出航</button></section>
+  </div>
+  <script type="module" src="/game/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,7 @@
+{
+  "name": "age-of-pirates",
+  "private": true,
+  "type": "module",
+  "scripts": { "start": "node preview-server.mjs", "test": "node --test game/*.test.mjs" },
+  "dependencies": { "three": "0.180.0" }
+}

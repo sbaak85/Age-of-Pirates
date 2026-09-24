@@ -1,0 +1,80 @@
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+const renderer = new THREE.WebGLRenderer({ antialias:true, powerPreference:'high-performance' });
+renderer.setPixelRatio(Math.min(devicePixelRatio,1.35));
+renderer.setSize(innerWidth,innerHeight);
+renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.15;
+document.body.prepend(renderer.domElement);
+const scene=new THREE.Scene();scene.background=new THREE.Color('#070e17');scene.fog=new THREE.FogExp2('#070e17',.024);
+const camera=new THREE.PerspectiveCamera(43,innerWidth/innerHeight,.1,110);
+camera.position.set(14,10,19);
+const controls=new OrbitControls(camera,renderer.domElement);controls.target.set(0,3,0);controls.enableDamping=true;controls.minDistance=12;controls.maxDistance=35;controls.maxPolarAngle=Math.PI*.48;controls.enablePan=false;
+scene.add(new THREE.HemisphereLight(0x91bfdc,0x171119,1.4));
+const rim=new THREE.DirectionalLight(0x9fcbe9,3);rim.position.set(-8,12,-7);scene.add(rim);
+const flash=new THREE.PointLight(0xff8b22,0,24,2);flash.position.set(0,2.6,0);scene.add(flash);
+const floor=new THREE.Mesh(new THREE.PlaneGeometry(150,150),new THREE.MeshStandardMaterial({color:0x182732,roughness:.43,metalness:.42}));floor.rotation.x=-Math.PI/2;scene.add(floor);
+const stage=new THREE.Mesh(new THREE.CylinderGeometry(5.7,5.9,.18,96),new THREE.MeshStandardMaterial({color:0x25313a,roughness:.67,metalness:.3}));stage.position.y=.01;scene.add(stage);
+for(const radius of [5.3,5.6]){const m=new THREE.Mesh(new THREE.TorusGeometry(radius,.018,6,128),new THREE.MeshBasicMaterial({color:0x657575}));m.rotation.x=Math.PI/2;m.position.y=.11;scene.add(m);}
+
+// A bounded 3D density field, integrated front to back. No billboard smoke sprites.
+const volumeMat=new THREE.ShaderMaterial({transparent:true,depthWrite:false,side:THREE.BackSide,
+ uniforms:{uTime:{value:0},uEye:{value:new THREE.Vector3()}},
+ vertexShader:`varying vec3 vWorld;void main(){vWorld=(modelMatrix*vec4(position,1.)).xyz;gl_Position=projectionMatrix*viewMatrix*vec4(vWorld,1.);}`,
+ fragmentShader:`precision highp float;varying vec3 vWorld;uniform vec3 uEye;uniform float uTime;
+ float hash(vec3 p){p=fract(p*.3183099+vec3(.13,.27,.43));p*=17.;return fract(p.x*p.y*p.z*(p.x+p.y+p.z));}
+ float noise(vec3 p){vec3 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(mix(hash(i),hash(i+vec3(1,0,0)),f.x),mix(hash(i+vec3(0,1,0)),hash(i+vec3(1,1,0)),f.x),f.y),mix(mix(hash(i+vec3(0,0,1)),hash(i+vec3(1,0,1)),f.x),mix(hash(i+vec3(0,1,1)),hash(i+vec3(1,1,1)),f.x),f.y),f.z);}
+ float fbm(vec3 p){return noise(p)*.57+noise(p*2.07+13.)*.29+noise(p*4.13)*.14;}
+ float field(vec3 p,float t){float grow=1.-exp(-t*4.);float rise=max(0.,t-.35);float r=.55+grow*1.45+rise*.14;float d=-10.;
+ for(int i=0;i<4;i++){float a=float(i)*2.39996;float spread=(i==0?0.:1.)*grow*(1.1+rise*.10);vec3 c=vec3(cos(a)*spread,1.2+rise*.93+sin(float(i)*7.)*.7*grow,sin(a)*spread);float q=1.-length((p-c)/vec3(r,r*(1.+.13*sin(a)),r));d=max(d,q);}
+ float stem=1.-length((p-vec3(0.,1.+rise*.35,0.))/vec3(.75+grow*.3,1.+rise*.4,.75+grow*.3));
+ d=max(d,stem*.65);vec3 adv=p*1.45-vec3(t*.22,t*.8,t*.12);return max(0.,d+(fbm(adv)-.5)*.65)*smoothstep(0.,.09,t)*(1.-smoothstep(2.4,4.4,t));}
+ void main(){float t=uTime;vec3 rd=normalize(vWorld-uEye);vec3 inv=1./rd;vec3 a=(vec3(-7.,.13,-7.)-uEye)*inv,b=(vec3(7.,12.,7.)-uEye)*inv;vec3 lo=min(a,b),hi=max(a,b);float near=max(max(lo.x,lo.y),lo.z),far=min(min(hi.x,hi.y),hi.z);near=max(0.,near);if(far<=near||t<0.)discard;
+ float stepSize=(far-near)/64.;float jitter=hash(vec3(gl_FragCoord.xy,0.));vec4 sum=vec4(0.);vec3 lightDir=normalize(vec3(-.5,1.,-.65));
+ for(int j=0;j<64;j++){vec3 p=uEye+rd*(near+(float(j)+jitter)*stepSize);float d=field(p,t);if(d>.012){float n=fbm(p*2.1-vec3(0,t*1.6,0));float heat=(1.-smoothstep(.35,2.0,t))*smoothstep(.12,.65,d)*smoothstep(.25,.72,n)*1.5;heat*=1.-smoothstep(2.3,5.8,p.y);
+ float shade=exp(-field(p+lightDir*.55,t)*7.0);vec3 smoke=mix(vec3(.013,.017,.022),vec3(.14,.17,.20),shade);float inner=exp(-length(p-vec3(0,1.8,0))*.55)*exp(-t*1.6);smoke+=vec3(1.,.22,.025)*inner*1.3;
+ vec3 fire=mix(vec3(1.3,.085,.006),vec3(3.2,1.35,.15),smoothstep(.22,.8,heat));vec3 col=mix(smoke,fire,smoothstep(.04,.68,heat));float alpha=1.-exp(-d*stepSize*mix(4.2,3.0,smoothstep(.7,1.8,t)));sum.rgb+=(1.-sum.a)*alpha*col;sum.a+=(1.-sum.a)*alpha;if(sum.a>.985)break;}}
+ if(sum.a<.005)discard;gl_FragColor=vec4(sum.rgb/max(sum.a,.001),sum.a);}`});
+const volume=new THREE.Mesh(new THREE.BoxGeometry(14,11.87,14),volumeMat);volume.position.y=6.065;volume.renderOrder=3;scene.add(volume);
+
+const debrisMaterial=new THREE.MeshStandardMaterial({color:0x302323,roughness:.8,metalness:.22,emissive:0xff4308,emissiveIntensity:0});
+const debris=new THREE.InstancedMesh(new THREE.DodecahedronGeometry(1,0),debrisMaterial,32);scene.add(debris);
+let seed=912;const random=()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296;};
+const chunks=Array.from({length:32},()=>{const angle=random()*Math.PI*2,speed=2+random()*6;return{vx:Math.cos(angle)*speed,vz:Math.sin(angle)*speed,vy:3+random()*9,size:.045+random()**2*.21,spin:random()*8,phase:random()*6};});
+const sparksCount=100,positions=new Float32Array(sparksCount*6),colors=new Float32Array(sparksCount*6);
+const sparkData=Array.from({length:sparksCount},()=>{const a=random()*6.283,s=2+random()*9;return{vx:Math.cos(a)*s,vz:Math.sin(a)*s,vy:2+random()*12,life:.5+random()*1.6};});
+const sparkGeo=new THREE.BufferGeometry();sparkGeo.setAttribute('position',new THREE.BufferAttribute(positions,3));sparkGeo.setAttribute('color',new THREE.BufferAttribute(colors,3));
+const sparkMaterial=new THREE.LineBasicMaterial({vertexColors:true,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false});const sparks=new THREE.LineSegments(sparkGeo,sparkMaterial);sparks.frustumCulled=false;scene.add(sparks);
+const shock=new THREE.Mesh(new THREE.RingGeometry(.94,1,128),new THREE.MeshBasicMaterial({color:0xffc289,transparent:true,opacity:0,side:THREE.DoubleSide,depthWrite:false,blending:THREE.AdditiveBlending}));shock.rotation.x=-Math.PI/2;shock.position.y=.13;scene.add(shock);
+const glow=new THREE.Mesh(new THREE.SphereGeometry(1,24,16),new THREE.MeshBasicMaterial({color:0xffdf98,transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false}));glow.position.y=1.4;scene.add(glow);
+const composer=new EffectComposer(renderer);composer.addPass(new RenderPass(scene,camera));composer.addPass(new UnrealBloomPass(new THREE.Vector2(innerWidth,innerHeight),.28,.5,1.15));composer.addPass(new OutputPass());
+
+let elapsed=0,paused=false,slow=false,loop=true,last=performance.now();
+const $=id=>document.getElementById(id);const buttons=[...document.querySelectorAll('button')];
+function replay(){elapsed=0;paused=false;sync();}
+function sync(){$('pause').textContent=paused?'繼續播放':'暫停';$('pause').setAttribute('aria-pressed',paused);$('slow').setAttribute('aria-pressed',slow);$('loop').setAttribute('aria-pressed',loop);$('loop').textContent=`循環：${loop?'開':'關'}`;}
+$('replay').onclick=replay;$('pause').onclick=()=>{paused=!paused;sync();};$('slow').onclick=()=>{slow=!slow;sync();};$('loop').onclick=()=>{loop=!loop;sync();};
+let selected=0,repeatAt=0,heldA=false;const select=i=>{selected=(i+buttons.length)%buttons.length;buttons.forEach((b,j)=>b.classList.toggle('is-selected',j===selected));};
+document.addEventListener('pointerdown',()=>buttons.forEach(b=>b.classList.remove('is-selected')));
+document.addEventListener('keydown',e=>{if(e.code==='Space'&&e.target.tagName!=='BUTTON'){e.preventDefault();$('pause').click();}if(e.code==='KeyR')replay();if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.code)){e.preventDefault();select(selected+(['ArrowLeft','ArrowUp'].includes(e.code)?-1:1));buttons[selected].focus();}if(e.code==='Tab')requestAnimationFrame(()=>{const i=buttons.indexOf(document.activeElement);if(i>=0)select(i);});});
+document.addEventListener('visibilitychange',()=>{last=performance.now();});
+const dummy=new THREE.Object3D();
+function animate(now){requestAnimationFrame(animate);const dt=Math.min((now-last)/1000,.05);last=now;
+ const pad=navigator.getGamepads?.()[0];if(pad){const axis=Math.abs(pad.axes[0])>.5?pad.axes[0]:pad.axes[1];if(Math.abs(axis)>.5&&now>repeatAt){select(selected+Math.sign(axis));repeatAt=now+260;}if(Math.abs(axis)<.3)repeatAt=0;const a=pad.buttons[0]?.pressed;if(a&&!heldA){select(selected);buttons[selected].click();}heldA=a;}else heldA=false;
+ if(!paused&&!document.hidden){elapsed+=dt*(slow?.35:1);if(elapsed>7){if(loop)elapsed%=7;else{elapsed=7;paused=true;sync();}}}
+ const t=Math.max(0,elapsed-.25);volume.visible=t>0&&t<4.4;volumeMat.uniforms.uTime.value=t;volumeMat.uniforms.uEye.value.copy(camera.position);
+ flash.intensity=t>0?1800*Math.exp(-t*4)+200*Math.exp(-t*1.8)*(1+Math.sin(t*37)*.1):0;
+ glow.scale.setScalar(.5+Math.min(t,.16)*13);glow.material.opacity=t>0?Math.max(0,1-t/.23):0;
+ shock.scale.setScalar(1+t*13);shock.material.opacity=t>0?Math.max(0,.8-t*1.4):0;
+ debris.visible=t>0;debrisMaterial.emissiveIntensity=2.4*Math.exp(-t*1.8);
+ chunks.forEach((c,i)=>{const hit=(c.vy+Math.sqrt(c.vy*c.vy+2*9.8*1.2))/9.8;let y=1.2+c.vy*t-4.9*t*t;let travel=t;if(t>hit){const b=t-hit;y=.15+Math.max(0,c.vy*.24*b-4.9*b*b);travel=hit+(1-Math.exp(-b*3))*.45;}dummy.position.set(c.vx*travel,y,c.vz*travel);dummy.rotation.set(c.phase+t*c.spin,t*c.spin*.7,c.phase);dummy.scale.setScalar(c.size*(1-THREE.MathUtils.smoothstep(t,4.6,6.5)));dummy.updateMatrix();debris.setMatrixAt(i,dummy.matrix);});debris.instanceMatrix.needsUpdate=true;
+ sparkData.forEach((s,i)=>{const alive=t>0&&t<s.life;for(let end=0;end<2;end++){const q=Math.max(0,t-end*.025);const k=i*6+end*3;positions[k]=s.vx*q;positions[k+1]=Math.max(.14,1.5+s.vy*q-4*q*q);positions[k+2]=s.vz*q;const bright=alive?(1-t/s.life)*(end?.7:3):0;colors[k]=bright;colors[k+1]=bright*.48;colors[k+2]=bright*.08;}});sparkGeo.attributes.position.needsUpdate=true;sparkGeo.attributes.color.needsUpdate=true;
+ $('phase').textContent=t<.05?'準備引爆':t<.65?'衝擊波 · 火球爆發':t<1.65?'火焰與濃煙':t<2.4?'翻滾煙柱 · 碎片落地':'餘燼消散';$('time').textContent=`${elapsed.toFixed(2)} / 7.00 s`;$('progress').style.width=`${elapsed/7*100}%`;
+ controls.update();composer.render();
+}
+requestAnimationFrame(animate);
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);composer.setSize(innerWidth,innerHeight);});

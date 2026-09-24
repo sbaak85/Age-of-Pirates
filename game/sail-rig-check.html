@@ -1,0 +1,15 @@
+<!doctype html><html lang="zh-Hant"><meta charset="utf-8"><title>帆面收束動畫檢查</title><style>body{margin:0;background:#80b2b8;color:#fff;font:16px system-ui}p{position:fixed;left:24px;top:12px;pointer-events:none;line-height:1.8;text-shadow:0 1px 4px #123}</style><script type="importmap">{"imports":{"three":"/node_modules/three/build/three.module.js","three/addons/":"/node_modules/three/examples/jsm/"}}</script><p>拖曳環視／滾輪縮放 · Y 或 F 切換 · 手把 Y 切換<br><span id="status"></span></p><script type="module">
+import * as THREE from 'three';import {OrbitControls} from 'three/addons/controls/OrbitControls.js';import {createShip} from '../ship-preview/ship.js';import {createSailController} from './sail-rig.js';import {advanceSails} from './sail-motion.js';
+const scene=new THREE.Scene();scene.background=new THREE.Color(0x80b2b8);scene.add(new THREE.HemisphereLight(0xe4faff,0x413e3b,2));const sun=new THREE.DirectionalLight(0xffe4c0,3);sun.position.set(-8,12,9);scene.add(sun);
+const renderer=new THREE.WebGLRenderer({antialias:true});renderer.setPixelRatio(Math.min(devicePixelRatio,1.5));renderer.setSize(innerWidth,innerHeight);renderer.toneMapping=THREE.ACESFilmicToneMapping;document.body.append(renderer.domElement);renderer.domElement.tabIndex=0;renderer.domElement.style.outline='none';
+const camera=new THREE.PerspectiveCamera(40,innerWidth/innerHeight,.1,120);camera.position.set(11,8,14);const controls=new OrbitControls(camera,renderer.domElement);controls.target.set(.5,3.5,0);controls.update();
+const parts=createShip();scene.add(parts.ship);const sails=createSailController(parts);const plane=new THREE.Mesh(new THREE.PlaneGeometry(200,200),new THREE.MeshStandardMaterial({color:0x329ba5,roughness:.65}));plane.rotation.x=-Math.PI/2;plane.position.y=-.65;scene.add(plane);
+const mode=new URLSearchParams(location.search).get('pose');let deployment=mode==='furled'?0:mode==='half'?.5:1,target=deployment!==0,time=0,last=performance.now(),manual=Boolean(mode),lastY=false,frozen=mode==='half';
+function toggle(){manual=true;frozen=false;target=!target;}
+addEventListener('keydown',e=>{if(!e.repeat&&(e.code==='KeyY'||e.code==='KeyF'))toggle();});
+function frame(now){const dt=Math.min(.04,(now-last)/1000);last=now;time+=dt;const pad=Array.from(navigator.getGamepads()).find(Boolean),y=Boolean(pad?.buttons[3]?.pressed);if(y&&!lastY)toggle();lastY=y;
+if(!manual)target=time%9<4.5;
+if(!frozen)deployment=advanceSails(deployment,target,dt);
+sails.update(deployment,time);controls.update();renderer.render(scene,camera);document.getElementById('status').textContent=deployment===0?'收帆：皺褶布料與束繩保留':deployment===1?'張帆：完整帆面':'帆布變形中 '+Math.round(deployment*100)+'%';requestAnimationFrame(frame);}
+requestAnimationFrame(frame);addEventListener('resize',()=>{renderer.setSize(innerWidth,innerHeight);camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();});
+</script></html>

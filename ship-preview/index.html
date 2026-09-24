@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>暮潮號 · 海盜船艦預覽</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/ship-preview/style.css">
+  <script type="importmap">{"imports":{"three":"/node_modules/three/build/three.module.js","three/addons/":"/node_modules/three/examples/jsm/"}}</script>
+</head>
+<body>
+  <main id="viewer" aria-label="可旋轉的海盜世界 3D 預覽"></main>
+  <header>
+    <div class="eyebrow"><span class="sigil">✦</span> AGE OF PIRATES <span class="division">/</span> SHIPYARD</div>
+    <h1>暮潮號<span>THE DUSKTIDE</span></h1>
+    <p class="intro">雙桅海盜船 · 第一號船艦</p>
+  </header>
+  <aside class="manifest" aria-label="船艦設計">
+    <span class="overline">VESSEL / 001</span>
+    <div class="rule"></div>
+    <p>深藍帆裝<br>暖木船殼<br>雙側加農砲</p>
+    <span class="edition">造型預覽 · 初版</span>
+  </aside>
+  <div id="loading" role="status">正在準備船艦…</div>
+  <footer>
+    <div class="controls" role="toolbar" aria-label="模型觀看設定">
+      <button id="rotate" aria-pressed="true"><span class="icon">Ⅱ</span><span class="label">暫停自轉</span></button>
+      <button id="reset"><span class="icon">↺</span>重設視角</button>
+      <button id="sails" aria-pressed="true"><span class="icon">◈</span><span class="label">收起船帆</span></button>
+      <button id="waves" aria-pressed="true" hidden><span class="icon">≈</span><span class="label">海浪：開</span></button>
+      <button id="view"><span class="icon">◇</span><span class="label">查看小島</span></button>
+    </div>
+    <p class="hint">左鍵拖曳 · 旋轉觀看 <span>／</span> 滾輪 · 縮放 <span>／</span> 空白鍵 · 暫停</p>
+    <p class="pad-hint" id="pad-hint">方向鍵旋轉 · R 重設視角</p>
+  </footer>
+  <div class="corner"><span class="live-dot"></span><span id="status">3D MODEL PREVIEW</span></div>
+  <script type="module" src="/ship-preview/main.js"></script>
+</body>
+</html>

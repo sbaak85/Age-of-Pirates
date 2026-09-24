@@ -1,0 +1,12 @@
+node_modules/
+.pnpm-store/
+backups/
+.env
+.env.*
+!.env.example
+*.log
+Thumbs.db
+.DS_Store
+preview-server.log
+preview-server.err.log
+artifacts/

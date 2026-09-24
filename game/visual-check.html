@@ -1,0 +1,10 @@
+<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><title>海域霧化視覺驗證</title><style>body{margin:0;background:#6fa9ae;font:14px sans-serif}canvas{display:block}p{position:fixed;top:12px;left:16px;color:white;background:#12343ecc;padding:12px}</style><script type="importmap">{"imports":{"three":"/node_modules/three/build/three.module.js","three/addons/":"/node_modules/three/examples/jsm/"}}</script></head><body><p>開發驗證：海域邊界 70–96 m 漸進霧化</p><script type="module">
+import * as THREE from 'three';
+import {createWorld} from './world.js';
+import {applyEdgeFog} from './optimization.js';
+const scene=new THREE.Scene(),world=createWorld(scene);
+applyEdgeFog(scene);
+const renderer=new THREE.WebGLRenderer({antialias:true});renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(1);renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.2;document.body.appendChild(renderer.domElement);
+const camera=new THREE.PerspectiveCamera(54,innerWidth/innerHeight,.1,240);camera.position.set(74,23,13);camera.lookAt(98,0,0);
+world.update(10,1/60,{x:82,z:0});renderer.render(scene,camera);
+</script></body></html>

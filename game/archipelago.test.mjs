@@ -1,0 +1,51 @@
+import test from 'node:test';import assert from 'node:assert/strict';
+import {REGIONS,ENCOUNTERS,LOOT,WHIRLPOOLS,START,MAP_RADIUS,CORALHAVEN,navigable,whirlpoolForce,upgradeOffer,specialtyOffer} from './archipelago-data.js';
+import {createBoatState,stepBoat} from './physics.js';
+import {createWorld} from './world.js';import * as THREE from 'three';
+import {BUILDING_TYPES,buildingTypeFor,villageSlots,createTerrainBase} from './archipelago-art.js';
+import {TERRAIN} from './archipelago-data.js';
+test('original handcrafted island is restored beside the first port without blocking pickups',()=>{
+ const scene=new THREE.Scene(),world=createWorld(scene),island=world.far.getObjectByName('Coralhaven · original handmade island');
+ assert.ok(island);assert.ok(Math.hypot(island.position.x-REGIONS[0].dock.x,island.position.z-REGIONS[0].dock.z)<30);
+ assert.equal(navigable(CORALHAVEN.x,CORALHAVEN.z),false);
+ for(const item of [...ENCOUNTERS,...LOOT]){const x=item.start?.[0]??item.x,z=item.start?.[1]??item.z;assert.ok(navigable(x,z,2),item.id);}
+});
+test('each port has ten distinct building silhouettes and a stable staggered layout',()=>{
+ assert.equal(BUILDING_TYPES.length,10);
+ for(const r of REGIONS){const slots=villageSlots(r),again=villageSlots(r);assert.deepEqual(slots,again);assert.equal(slots.length,21);assert.equal(new Set(slots.map(s=>buildingTypeFor(r.id,s.slot).id)).size,10);assert.ok(new Set(slots.map(s=>Math.round(s.heading*100))).size>4);}
+});
+test('central canyon cliffs keep their intended long axis',()=>{
+ for(const t of TERRAIN.filter(t=>t.seed>=51)){const g=createTerrainBase(t),bounds=new THREE.Box3().setFromObject(g),size=bounds.getSize(new THREE.Vector3());assert.ok(size.z>size.x*1.5,`central cliff ${t.seed} turned sideways`);}
+});
+test('five ports, all encounters and loot spawn in accessible water',()=>{
+ assert.equal(REGIONS.length,5);assert.equal(ENCOUNTERS.length,30);assert.equal(LOOT.length,40);
+ for(const r of REGIONS)assert.ok(navigable(r.dock.x,r.dock.z,3),r.id);
+ for(const e of ENCOUNTERS)assert.ok(navigable(...e.start,e.radius),e.id);
+ for(const l of LOOT)assert.ok(navigable(l.x,l.z,2),l.id);
+ // Complete circumnavigation at 111 U radius with ship clearance.
+ for(let i=0;i<720;i++){const a=i*Math.PI/360;assert.ok(navigable(Math.cos(a)*111,Math.sin(a)*111,5));}
+ assert.ok(Math.abs(MAP_RADIUS**2/94**2-5)<.02);
+});
+test('grid flood fill reaches every port and treasure from initial spawn',()=>{
+ const step=4,min=-208,max=208,n=(max-min)/step+1,key=(x,z)=>x+z*n;
+ const ix=x=>Math.round((x-min)/step);const queue=[[ix(START.x),ix(START.z)]],seen=new Set([key(...queue[0])]);
+ for(let j=0;j<queue.length;j++){const [x,z]=queue[j];for(const [dx,dz] of [[1,0],[-1,0],[0,1],[0,-1]]){const a=x+dx,b=z+dz,k=key(a,b);if(a<0||b<0||a>=n||b>=n||seen.has(k)||!navigable(min+a*step,min+b*step,2))continue;seen.add(k);queue.push([a,b]);}}
+ for(const p of [...REGIONS.map(r=>r.dock),...LOOT])assert.ok(seen.has(key(ix(p.x),ix(p.z))),JSON.stringify(p));
+});
+test('whirlpool attracts and damages nearby idle ship but sustained full sail escapes',()=>{
+ const v=WHIRLPOOLS[0],idle={x:v.x+5,z:v.z};const before=Math.hypot(idle.x-v.x,idle.z-v.z);assert.ok(whirlpoolForce(idle,v,.1)>0);assert.ok(Math.hypot(idle.x-v.x,idle.z-v.z)<before);
+ const b=createBoatState(v.x+5,v.z,0);let damage=0;for(let i=0;i<600;i++){stepBoat(b,{throttle:1},1/60);damage+=whirlpoolForce(b,v,1/60);}assert.ok(Math.hypot(b.x-v.x,b.z-v.z)>v.radius);assert.ok(damage>0&&damage<40);
+});
+test('regional upgrade caps, escalating cost and parts gate are consistent',()=>{
+ assert.equal(upgradeOffer({hull:3},REGIONS[0],'hull').available,false);assert.equal(upgradeOffer({hull:3},REGIONS[2],'hull').available,true);
+ assert.ok(upgradeOffer({cannon:3},REGIONS[2],'cannon').cost>upgradeOffer({cannon:1},REGIONS[2],'cannon').cost);
+ for(const r of REGIONS){assert.ok(specialtyOffer({},r).parts>0);assert.equal(specialtyOffer({armory:{[r.weapon]:3}},r).available,false);}
+});
+test('streamed region details load, release and revisit without duplicated scene roots',()=>{
+ const scene=new THREE.Scene(),world=createWorld(scene);let t=0;
+ for(let cycle=0;cycle<3;cycle++){
+  for(const r of REGIONS){for(let i=0;i<160;i++)world.update(t+=.1,.1,r.dock);}
+  assert.ok(world.stats().loaded<=3);assert.ok(scene.children.length<30);
+ }
+ assert.ok(world.stats().released>5);assert.ok(world.stats().built>5);
+});
