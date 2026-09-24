@@ -1,24 +1,10 @@
 import * as THREE from 'three';
-import {WAVES,WAVE_GLSL} from '../ship-preview/waves.js';
+import {createSea} from './sea.js';
 import {TERRAIN,REGIONS,OBSTACLES,CORALHAVEN,regionAt} from './archipelago-data.js';
 import {createTerrainBase,createVillageBase,detailsForRegion,createArches,createWhirlpoolVisuals,releaseChunk,instanceKit,consolidateChunk} from './archipelago-art.js';
 import {createIsland} from '../ship-preview/island.js';
 import {batchStatic} from './optimization.js';
 import {createCameraOcclusion} from './camera-occlusion.js';
-function createSea(){
- const size=256,data=new Uint8Array(size*size*4);
- for(let z=0;z<size;z++)for(let x=0;x<size;x++){
-  const wx=(x/(size-1)-.5)*512,wz=(z/(size-1)-.5)*512;
-  let d=999;for(const t of TERRAIN)d=Math.min(d,(Math.hypot((wx-t.x)/t.rx,(wz-t.z)/t.rz)-1)*Math.min(t.rx,t.rz));
-  d=Math.min(d,(Math.hypot((wx-CORALHAVEN.x)/15,(wz-CORALHAVEN.z)/12)-1)*12);
-  const v=Math.round(255*THREE.MathUtils.clamp(d/18,0,1)),i=(z*size+x)*4;data[i]=v;data[i+1]=v;data[i+2]=v;data[i+3]=255;
- }
- const shore=new THREE.DataTexture(data,size,size);shore.minFilter=shore.magFilter=THREE.LinearFilter;shore.needsUpdate=true;
- const uniforms={overview:{value:0},time:{value:0},strength:{value:1},openSea:{value:1},shore:{value:shore},waves:{value:WAVES.map(w=>new THREE.Vector4(...w.direction,w.k,w.amplitude))},speeds:{value:WAVES.map(w=>w.speed)},fogColor:{value:new THREE.Color(0xa8c6cc)}};
- const geo=new THREE.PlaneGeometry(512,512,160,160);geo.rotateX(-Math.PI/2);
- const mat=new THREE.ShaderMaterial({uniforms,vertexShader:`${WAVE_GLSL} varying vec3 wp;varying vec3 norm;void main(){vec3 f=waveField(position.xz);wp=vec3(position.x,f.x,position.z);norm=normalize(vec3(-f.y,1.,-f.z));gl_Position=projectionMatrix*viewMatrix*vec4(wp,1.);}`,fragmentShader:`uniform float time;uniform float overview;uniform sampler2D shore;uniform vec3 fogColor;varying vec3 wp;varying vec3 norm;void main(){float d=texture2D(shore,wp.xz/512.+.5).r;vec3 c=mix(vec3(.15,.77,.68),vec3(.018,.30,.41),smoothstep(.02,1.,d));float rip=sin(wp.x*.7+wp.z*1.2+sin(wp.z*.63+wp.x*.35)*2.-time*.8);c+=vec3(.012,.023,.018)*rip*(1.-d);vec3 light=normalize(vec3(-.5,1.,.3));float spec=pow(max(0.,dot(norm,normalize(light+normalize(cameraPosition-wp)))),70.);c+=vec3(.65,.86,.8)*spec*.36;float foam=(1.-smoothstep(.025,.11,d))*smoothstep(.005,.018,d)*(.65+.35*sin(time*2.-d*120.));c=mix(c,vec3(.81,.95,.87),foam);float fog=max(smoothstep(178.,212.,length(wp.xz)),smoothstep(65.,165.,length(cameraPosition-wp))*.7*(1.-overview));gl_FragColor=vec4(c,1.);#include <tonemapping_fragment>\n#include <colorspace_fragment>\ngl_FragColor.rgb=mix(gl_FragColor.rgb,vec3(.6588,.7765,.8),fog);}`.replace(';#include',';\n#include')});
- const mesh=new THREE.Mesh(geo,mat);mesh.frustumCulled=false;mesh.name='A2 seamless shallow-water ocean';return {mesh,setOverview:v=>uniforms.overview.value=v?1:0,update:t=>uniforms.time.value=t,setEnabled:v=>uniforms.strength.value=v?1:0};
-}
 export function createWorld(scene){
  scene.background=new THREE.Color(0xa8c6cc);scene.fog=new THREE.Fog(0xa8c6cc,62,155);
  scene.add(new THREE.HemisphereLight(0xe0fff2,0x8c7259,1.35));
@@ -31,7 +17,7 @@ export function createWorld(scene){
  const materialKit=new Map();coralhaven.island.traverse(o=>{if(!o.isMesh||o.material.map||o.material.transparent)return;const m=o.material,k=[m.color.getHex(),m.roughness,m.metalness,m.side,m.flatShading,m.vertexColors].join('/');if(materialKit.has(k))o.material=materialKit.get(k);else materialKit.set(k,m);});
  batchStatic(coralhaven.island);far.add(coralhaven.island);
  const chunks=REGIONS.map(r=>{const village=createVillageBase(r);far.add(village);return {region:r,village,detail:null,generator:null,ready:false,lastNear:0};});
- createArches(far);const ocean=createSea();scene.add(ocean.mesh);const whirlUpdate=createWhirlpoolVisuals(scene);
+ createArches(far);const ocean=createSea();scene.add(ocean.seabed,ocean.mesh);const whirlUpdate=createWhirlpoolVisuals(scene);
  let clock=0,overview=false,totalBuilt=0,totalReleased=0;const batching={before:0,after:0};far.traverse(o=>{if(o.isMesh){batching.before+=o.isInstancedMesh?o.count:1;batching.after++;}});
  const occlusion=createCameraOcclusion();occlusion.attach(far);
  const world={obstacles:OBSTACLES,outposts:[],sun,ocean,batching,far,occlusion,
