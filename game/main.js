@@ -384,6 +384,7 @@ function updateTargetLabels(){
 function gamepadUpdate(){
   const pad=Array.from(navigator.getGamepads?.()||[]).find(p=>p?.connected);
   if(!pad){previousButtons={};return null;}
+  if(window.pirateStartup?.active){previousButtons=Object.fromEntries(pad.buttons.map((b,i)=>[i,b.pressed]));return null;}
   const pressed=index=>!!pad.buttons[index]?.pressed;
   const edge=index=>pressed(index)&&!previousButtons[index];
   if(phase==='playing'){
@@ -418,6 +419,7 @@ function frame(now){
   for(const cannon of shipParts.cannons){cannon.userData.recoil=Math.max(0,(cannon.userData.recoil||0)-dt*4);cannon.position.z=-cannon.userData.side*Math.sin(cannon.userData.recoil*Math.PI*.5)*.13;}
   shadowTimer-=dt;if(shadowTimer<=0){renderer.shadowMap.needsUpdate=true;shadowTimer=settings.quality==='high'?.033:.10;}
   renderer.render(scene,camera);requestAnimationFrame(frame);
+  if(window.pirateStartup?.active)window.pirateStartup.report(world.stats().loaded>0?100:75,world.stats().loaded>0?'Ready to sail':'Building your home port');
   performanceTimer-=dt;if(performanceTimer<=0){performanceTimer=.5;$('#performance').textContent=`${Math.round(smoothedFps)} FPS · 區塊 ${world.stats().loaded}/5 · 近敵 ${targetStreamer.count()} · ${renderer.info.render.calls} draws · ${Math.round(renderer.info.render.triangles/1000)}k 三角形`;$('#performance').classList.toggle('hidden',!settings.stats);}
 }
 
@@ -444,6 +446,7 @@ for(const button of document.querySelectorAll('[data-buy]'))button.addEventListe
 $('#volume').addEventListener('input',event=>{settings.volume=Number(event.target.value)/100;$('#volume-output').textContent=`${event.target.value}%`;sound.setVolume(settings.volume);persistSettings();});
 for(const id of ['shake','rumble','guide'])$(`#${id}`).addEventListener('change',event=>{settings[id]=event.target.checked;persistSettings();});
 window.addEventListener('keydown',event=>{
+  if(window.pirateStartup?.active)return;
   if(['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(event.code)||(phase==='playing'&&event.code==='Enter'))event.preventDefault();
   if(phase==='playing'){
     if(event.code==='KeyM'&&!event.repeat)openChart();else if(event.code==='Escape')pause();else if(event.code==='KeyF'&&!event.repeat)toggleSails();
@@ -472,4 +475,6 @@ for(const target of targets){
   label.querySelector('span').textContent=target.name;target.label=label;target.healthFill=label.querySelector('i');target.healthText=label.querySelector('small');$('#target-labels').appendChild(label);
 }
 applyQuality();updateLoadout();
+window.pirateStartup?.report(55,'Preparing the sea and ship');
+renderer.domElement.addEventListener('webglcontextlost',event=>{event.preventDefault();window.pirateStartup?.fail();});
 openPanel('title');playerModel.position.set(boat.x,.38,boat.z);camera.position.set(boat.x+16,24,boat.z+19);requestAnimationFrame(frame);

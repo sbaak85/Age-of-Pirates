@@ -6,9 +6,22 @@
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="/game/style.css">
   <link rel="stylesheet" href="/game/upgrades.css">
+  <link rel="stylesheet" href="/game/startup.css">
   <script type="importmap">{"imports":{"three":"/node_modules/three/build/three.module.js","three/addons/":"/node_modules/three/examples/jsm/"}}</script>
 </head>
 <body>
+  <section id="startup" aria-label="Age of Pirates" data-state="cover">
+    <img id="cover-art" src="/game/assets/age-of-pirates-cover-v1.png" alt="Age of Pirates — four pirate heroes above a ship in battle">
+    <div id="cover-fallback">Age of Pirates</div>
+    <button id="continue-button" type="button">Click to continue</button>
+    <div id="startup-loading" role="status" aria-live="polite"><p id="startup-message">Preparing your voyage</p><progress id="startup-progress" max="100" value="0"></progress><span id="startup-percent">0%</span></div>
+    <button id="startup-retry" type="button" hidden>Retry loading</button>
+  </section>
+  <script src="/game/startup.js"></script>
+  <script>
+    // Independent recovery if the bootstrap itself cannot be downloaded or parsed.
+    setTimeout(function(){if(!window.pirateStartup){var s=document.getElementById('startup');s.dataset.state='error';document.getElementById('startup-message').textContent='Unable to load. Please retry.';var b=document.getElementById('startup-retry');b.hidden=false;b.onclick=function(){location.reload();};}},8000);
+  </script>
   <div id="scene" aria-label="海戰紀元 3D 遊戲畫面"></div>
   <div id="vignette"></div><div id="hurt"></div>
   <header id="hud" class="hidden">
@@ -40,6 +53,5 @@
     <section id="dock-panel" class="panel hidden"><p class="overline">CORALHAVEN SHIPYARD</p><h2>珊瑚灣船塢</h2><p class="dock-desc">帶回寶箱、修補船殼，為下一次航程整備。</p><div class="shop-list"><button data-buy="repair" id="buy-repair"><span>修理船殼</span><small>回復 60 耐久 · 15 金</small></button><button data-buy="hull" id="buy-hull"><span>加固龍骨 <em id="hull-level">0 / 3</em></span><small>耐久上限 +25 · 60 金起</small></button><button data-buy="speed" id="buy-speed"><span>迅航帆裝 <em id="speed-level">0 / 3</em></span><small>航行速度 +8% · 60 金起</small></button><button data-buy="cannon" id="buy-cannon"><span>精鑄加農砲 <em id="cannon-level">0 / 3</em></span><small>每發傷害 +4 · 80 金起</small></button></div><p class="dock-money" id="dock-money">持有 0 金</p><button id="dock-back" class="primary">離開船塢</button></section>
     <section id="result-panel" class="panel hidden"><p class="overline" id="result-kicker">VOYAGE COMPLETE</p><h2 id="result-title">航程完成</h2><p id="result-description">六組目標已清除，寶箱已帶回珊瑚灣。</p><div id="result-stats"></div><button id="result-restart" class="primary">再次出航</button></section>
   </div>
-  <script type="module" src="/game/main.js"></script>
 </body>
 </html>
