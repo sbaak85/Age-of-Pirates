@@ -1,3 +1,4 @@
+import {populateSharks} from './shark-population.js';
 // A2 authored layout: persistent world data is independent of streamed visual detail.
 export const MAP_RADIUS=210;
 export const polar=(a,r)=>({x:Math.cos(a)*r,z:Math.sin(a)*r});
@@ -100,7 +101,7 @@ export function isEnemyPositionRestricted(target,x,z){
 }
 export function dockAt(x,z){return REGIONS.find(r=>Math.hypot(x-r.dock.x,z-r.dock.z)<10)||null;}
 export function navigable(x,z,padding=2){return Math.hypot(x,z)<MAP_RADIUS-padding&&!OBSTACLES.some(o=>Math.hypot((x-o.x)/(o.rx+padding),(z-o.z)/(o.rz+padding))<1);}
-export const ENCOUNTERS=REGIONS.flatMap((r,i)=>r.id==='harbor'?[]:['ship','shark','school','ship','submarine','octopus'].flatMap((type,j)=>{
+const BASE_ENCOUNTERS=REGIONS.flatMap((r,i)=>r.id==='harbor'?[]:['ship','shark','school','ship','submarine','octopus'].flatMap((type,j)=>{
  // Replace only the reef kraken with seven individually tracked sharks.
  if(r.id==='reef'&&type==='octopus')return Array.from({length:7},(_,n)=>{
   const p=polar(r.angle+(n-3)*.095, n%2?119:109);
@@ -109,6 +110,7 @@ export const ENCOUNTERS=REGIONS.flatMap((r,i)=>r.id==='harbor'?[]:['ship','shark
  const a=r.angle+(j-2.5)*.15,p=polar(a,j%2?107:115);
  return {id:`${r.id}-${j}`,name:`${r.name} · ${['巡防海盜','尖牙鯊魚','黃金魚群','掠奪艦','銅翼潛艇','赤潮克拉肯'][j]}`,region:r.id,type,hp:Math.round(({ship:100,shark:75,school:60,submarine:115,octopus:180}[type])*(1+(r.tier-1)*.16)),radius:type==='octopus'?4.5:type==='school'?2.7:2.3,speed:type==='school'?4.7:type==='shark'?4:type==='octopus'?1.7:2.7,reward:25+r.tier*12,color:[0xa94635,0x355e72,0x557e80,0x65576e,0x9e6f39][i],hostile:!['shark','school'].includes(type),fleeing:['shark','school'].includes(type),start:[p.x,p.z]};
 }));
+export const ENCOUNTERS=populateSharks(BASE_ENCOUNTERS,{regions:REGIONS,navigable,regionAt,restricted:isEnemyPositionRestricted});
 export const LOOT=REGIONS.flatMap(r=>Array.from({length:8},(_,j)=>{
  const p=polar(r.angle+(j-3.5)*.12,j%2?125:99);
  return {id:`loot-${r.id}-${j}`,region:r.id,...p,kind:j%3===0?'parts':'gold',amount:j%3===0?2+r.tier:18+r.tier*8};

@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+ <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+ <title>鯊魚圖鑑 · 兩款模型與游泳動畫</title>
+ <style>
+  *{box-sizing:border-box}html,body{width:100%;height:100%;margin:0}body{overflow:hidden;background:#0a2431;color:#edf8f5;font:14px system-ui,"Microsoft JhengHei",sans-serif}
+  canvas{position:fixed;inset:0;width:100%;height:100%;z-index:0}header,footer{position:fixed;left:0;right:0;z-index:3;background:#091d2ae8;backdrop-filter:blur(12px)}header{top:0;min-height:86px;padding:16px 25px;border-bottom:1px solid #8bd7d42a}h1{margin:0 0 5px;font-size:22px;letter-spacing:.055em}header p{margin:0;font-size:12px;color:#a8c7cb}
+  #stage{position:fixed;inset:86px 0 105px;z-index:1;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:1fr;touch-action:none;cursor:grab}#stage.dragging{cursor:grabbing}#stage.single{grid-template-columns:1fr;grid-template-rows:1fr}.panel{position:relative;border:1px solid #a4e4df25;min-width:0;min-height:0}.panel[hidden]{display:none}.tag{position:absolute;left:15px;top:13px;padding:7px 10px;border-radius:7px;background:#081b25c9;border:1px solid #a9d7ca48;pointer-events:none}.tag strong{display:block;font-size:16px;color:#f3e7c8}.tag span{display:block;margin-top:2px;color:#a2c6ca;font-size:11px}.tag small{display:block;margin-top:2px;color:#7facb4;font-size:10px}
+  footer{bottom:0;min-height:105px;padding:10px 16px;border-top:1px solid #8bd7d42a;display:flex;align-items:center;justify-content:center;gap:7px;flex-wrap:wrap}button{border:1px solid #acd9d458;border-radius:7px;background:#153846;color:#e9f4ed;padding:8px 11px;font:inherit;font-size:12px;cursor:pointer;transition:background .15s,border-color .15s}button:hover{background:#285967}button.active{background:#295a64;border-color:#a9d8b3;color:#fff1c9}button.is-selected{background:#68532e;border-color:#ffdc91}button:focus,button:focus-visible{outline:none!important;box-shadow:none!important;-webkit-tap-highlight-color:transparent}#status{font-size:12px;min-width:72px;color:#f0d99c;text-align:center}.hint{width:100%;margin:0;text-align:center;color:#8bafb8;font-size:11px}
+  @media(max-width:650px){header{padding:10px 14px;min-height:72px}h1{font-size:17px}header p{font-size:10px}#stage{inset:72px 0 122px}.tag{left:6px;top:6px;padding:4px 6px}.tag strong{font-size:11px}.tag span,.tag small{display:none}footer{min-height:122px;gap:4px;padding:7px}button{font-size:10px;padding:6px}.hint{font-size:9px}}
+ </style>
+ <script type="importmap">{"imports":{"three":"/vendor/three/build/three.module.js","three/addons/":"/vendor/three/examples/jsm/"}}</script>
+</head>
+<body>
+ <header><h1>鯊魚圖鑑 · 兩款 3D 模型</h1><p>依照 Assets／鯊魚 參考圖重製 · 連續身體彎曲、尾柄與尾鰭擺動、胸鰭調姿 · 目前僅供預覽</p></header>
+ <div id="stage" aria-label="兩款鯊魚游泳動畫預覽">
+  <div class="panel"><div class="tag"><strong>① 礁岩巨顎</strong><span>厚實頭部 · 冷灰背 / 象牙腹</span><small>參考：Stylized sharks / Greta</small></div></div>
+  <div class="panel"><div class="tag"><strong>② 碧海獵手</strong><span>流線體態 · 藍背 / 奶油腹</span><small>參考：Stylized sharks / Tibu</small></div></div>
+
+
+ </div>
+ <footer><button data-view="all" class="active">兩款比較</button><button data-view="0">① 大白鯊</button><button data-view="1">② 碧海獵手</button><button id="burst">衝刺：關</button><button id="slow">慢動作：關</button><button id="pause">暫停</button><button id="reset">重播</button><span id="status">巡弋中</span><p class="hint">拖曳：同步環視 · 滾輪：縮放 · 方向鍵或手把左搖桿：選取 · Enter 或手把 A：確認</p></footer>
+ <script type="module" src="./shark-preview.js"></script>
+</body>
+</html>
+

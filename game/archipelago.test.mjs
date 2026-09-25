@@ -127,7 +127,7 @@ test('both Warm Sand channels stay navigable below skyhouses and upper cliff wal
  }
 });
 test('five ports, all encounters and loot spawn in accessible water',()=>{
- assert.equal(REGIONS.length,5);assert.equal(ENCOUNTERS.length,30);assert.equal(LOOT.length,40);
+ assert.equal(REGIONS.length,5);assert.equal(ENCOUNTERS.length,34);assert.equal(LOOT.length,40);
  for(const r of REGIONS)assert.ok(navigable(r.dock.x,r.dock.z,3),r.id);
  for(const e of ENCOUNTERS)assert.ok(navigable(...e.start,e.radius),e.id);
  for(const l of LOOT)assert.ok(navigable(l.x,l.z,2),l.id);

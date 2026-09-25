@@ -1,3 +1,4 @@
+import {createGameShark} from './game-shark.js';
 import * as THREE from 'three';
 import { createGameKraken } from './game-kraken.js';
 
@@ -42,19 +43,6 @@ function pirateShip(color){
   const flag=triangular(group,[[-.65,3.97,0],[-1.27,3.99,.02],[-1.04,3.78,.05],[-.65,3.78,0]],sail);
   group.userData.flag=flag;
   return {group,animate(t){group.position.y=Math.sin(t*1.1)*.055;}};
-}
-function shark(){
-  const group=new THREE.Group(),body=M(0x416c7d),belly=M(0xb8c8bb),dark=M(0x213e48);
-  ellipsoid(group,0,0,0,1.68,.44,.56,body,3);
-  ellipsoid(group,.22,-.2,0,1.17,.25,.46,belly,2);
-  const nose=add(group,new THREE.ConeGeometry(.36,.72,12),body,1.65,.01,0);nose.rotation.z=-Math.PI/2;
-  triangular(group,[[-.2,.32,-.06],[-.60,1.03,0],[-.85,.27,.07],[.1,.36,.07]],body);
-  for(const side of [-1,1]){triangular(group,[[.2,-.04,side*.4],[-.7,-.18,side*1.12],[-.7,-.19,side*.35],[.2,-.05,side*.41]],body);ellipsoid(group,1.0,.10,side*.44,.055,.055,.055,dark,1);for(let i=0;i<3;i++)box(group,.035,.20,.018,.35-i*.12,-.04,side*.53,dark);}
-  const tail=new THREE.Group();tail.position.x=-1.63;group.add(tail);
-  rod(tail,[0,0,0],[-.56,0,0],.16,body);
-  triangular(tail,[[-.53,0,0],[-.95,.7,0],[-.86,0,.02],[-.58,-.03,.01]],body);
-  triangular(tail,[[-.53,0,0],[-.78,-.58,0],[-.88,0,.02],[-.58,.03,.01]],body);
-  return {group,animate(t){tail.rotation.y=Math.sin(t*8)*.31;group.rotation.z=Math.sin(t*2.3)*.025;}};
 }
 function octopus(){
   const group=new THREE.Group(),purple=M(0x91506c),underside=M(0xc8808e),eye=M(0xffd3a2),pupil=M(0x17262d);
@@ -101,7 +89,7 @@ function submarine(){
   return {group,animate(t){propeller.rotation.x=t*9;group.position.y=Math.sin(t*1.5)*.1;}};
 }
 export function createTargetModel(def){
-  switch(def.type){case 'ship':return pirateShip(def.color);case 'shark':return shark();case 'octopus':return createGameKraken();case 'school':return goldenSchool();case 'submarine':return submarine();default:return pirateShip(def.color);}
+  switch(def.type){case 'ship':return pirateShip(def.color);case 'shark':return createGameShark(def);case 'octopus':return createGameKraken();case 'school':return goldenSchool();case 'submarine':return submarine();default:return pirateShip(def.color);}
 }
 export function createChest(){
   const group=new THREE.Group();group.name='Treasure chest';

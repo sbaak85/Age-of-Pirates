@@ -8,9 +8,9 @@ test('the whole named harbor is safe, all targets spawn outside with body cleara
  for(let x=-200;x<=200;x+=5)for(let z=-200;z<=200;z+=5){
   assert.equal(isHarborSafeZone(x,z),regionAt(x,z).id==='harbor');
  }
- assert.equal(ENCOUNTERS.length,30);
+ assert.equal(ENCOUNTERS.length,34);
  for(const t of ENCOUNTERS){assert.notEqual(t.region,'harbor');assert.equal(isHarborSafeZone(...t.start,t.radius),false,t.id);}
- for(const r of REGIONS.slice(1))assert.equal(ENCOUNTERS.filter(t=>t.region===r.id).length,r.id==='reef'?12:6);
+ for(const r of REGIONS.slice(1))assert.equal(ENCOUNTERS.filter(t=>t.region===r.id).length,({reef:12,redrock:8,fjord:7,mist:7}[r.id]));
  assert.equal(LOOT.filter(t=>t.region==='harbor').length,8,'harbor exploration rewards remain');
 });
 test('safe boundary includes enemy radius so a hull cannot straddle it',()=>{

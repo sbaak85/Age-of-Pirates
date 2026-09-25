@@ -248,7 +248,7 @@ function updateTargets(dt){
     if(overlap<separation){const outward=overlap>.001?{x:(t.x-boat.x)/overlap,z:(t.z-boat.z)/overlap}:right(boat.yaw);t.x=boat.x+outward.x*separation;t.z=boat.z+outward.z*separation;}
     if(isEnemyPositionRestricted(t,t.x,t.z)){t.x=previousX;t.z=previousZ;}
     t.model.group.position.y=0;
-    t.model.animate(visualTime+t.patrol*.3,melee?.age);
+    t.model.animate(visualTime+t.patrol*.3,t.type==='shark'?(t.fleeing&&dist<24?'burst':'cruise'):melee?.age);
     const bob=t.model.group.position.y;
     t.model.group.position.set(t.x,(t.type==='submarine'?-.42:t.type==='shark'?-.35:.18)+bob,t.z);
     t.model.group.rotation.y=t.yaw;
