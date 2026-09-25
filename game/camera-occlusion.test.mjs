@@ -25,3 +25,30 @@ test('upper cliff fade lifts by 15 percent without accumulation and restores out
  for(let i=0;i<240;i++)cut.update(camera,null,target,1/60);
  assert.equal(cut.heightMultiplier,1);assert.ok(cut.uniforms.fadeAmount.value.every(x=>x===0));
 });
+
+test('open arch and nearby side walls do not fade merely because their bounds cross the sightline',()=>{
+ const cut=createCameraOcclusion(),root=new THREE.Group(),material=new THREE.MeshStandardMaterial();
+ for(const [x,y,w,h] of [[-8,12,3,24],[8,12,3,24],[0,25,19,3]]){
+  const mesh=new THREE.Mesh(new THREE.BoxGeometry(w,h,4),material);mesh.position.set(x,y,14);root.add(mesh);
+ }
+ cut.register(root);root.clear(); // Same removal performed by regional consolidation.
+ const camera=new THREE.PerspectiveCamera();camera.position.set(0,27.2,27);
+ for(let i=0;i<120;i++)cut.update(camera,null,new THREE.Vector3(),1/60);
+ assert.equal(cut.heightMultiplier,1);assert.ok(cut.uniforms.fadeAmount.value.every(x=>x===0));
+});
+test('instanced transformed walls still occlude after their render group is consolidated',()=>{
+ const cut=createCameraOcclusion(),root=new THREE.Group();root.position.x=7;
+ const mesh=new THREE.InstancedMesh(new THREE.BoxGeometry(10,40,4),new THREE.MeshStandardMaterial(),1);
+ mesh.setMatrixAt(0,new THREE.Matrix4().makeTranslation(-7,20,14));root.add(mesh);cut.register(root);root.clear();
+ const camera=new THREE.PerspectiveCamera();camera.position.set(0,27.2,27);
+ for(let i=0;i<4;i++)cut.update(camera,null,new THREE.Vector3(),1/60);
+ assert.equal(cut.heightMultiplier,1,'brief edge contact must not trigger');
+ for(let i=0;i<120;i++)cut.update(camera,null,new THREE.Vector3(),1/60);
+ assert.ok(cut.heightMultiplier>1.149);
+});
+test('geometry behind the boat never triggers foreground fading',()=>{
+ const cut=createCameraOcclusion(),wall=new THREE.Mesh(new THREE.BoxGeometry(20,40,4),new THREE.MeshStandardMaterial());wall.position.set(0,20,-12);cut.register(wall);
+ const camera=new THREE.PerspectiveCamera();camera.position.set(0,27.2,27);
+ for(let i=0;i<120;i++)cut.update(camera,null,new THREE.Vector3(),1/60);
+ assert.equal(cut.heightMultiplier,1);
+});

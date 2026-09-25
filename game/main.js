@@ -1,5 +1,5 @@
 import { directionalInput } from './directional-controls.js';
-import {REGIONS,TERRAIN,START,ENCOUNTERS,LOOT,WHIRLPOOLS,regionAt,isHarborSafeZone,dockAt,whirlpoolForce,upgradeOffer,specialtyOffer} from './archipelago-data.js';
+import {REGIONS,TERRAIN,START,ENCOUNTERS,LOOT,WHIRLPOOLS,regionAt,isHarborSafeZone,isReefKrakenExclusion,isEnemyPositionRestricted,dockAt,whirlpoolForce,upgradeOffer,specialtyOffer} from './archipelago-data.js';
 import {createTargetStreamer} from './target-stream.js';
 import { createSailController } from './sail-rig.js';
 import * as THREE from 'three';
@@ -216,9 +216,13 @@ function updateTargets(dt){
     if(!t.model.loaded)continue;
     if(!t.alive){const progress=clamp((gameTime-t.sinkAt)/1.1,0,1);t.model.group.position.y=t.sinkY-progress*progress*2.4;t.model.group.rotation.z=progress*.32;t.model.group.scale.copy(t.baseScale).multiplyScalar(1-progress*.45);t.model.group.visible=progress<1;continue;}
     if(t.type==='structure')continue;
+    // Recover a kraken already outside its permitted waters before AI or collision pushes.
+    if(t.type==='octopus'&&isEnemyPositionRestricted(t,t.x,t.z)){
+      t.x=t.anchorX;t.z=t.anchorZ;t.melee=undefined;
+    }
     const dx=boat.x-t.x,dz=boat.z-t.z,dist=Math.hypot(dx,dz);
     const previousX=t.x,previousZ=t.z;
-    const melee=t.type==='octopus'?stepKrakenCombat(t,boat,gameTime,safe):null;
+    const melee=t.type==='octopus'?stepKrakenCombat(t,boat,gameTime,safe||isReefKrakenExclusion(boat.x,boat.z)):null;
     if(melee?.started){notify('克拉肯抬起觸手！駛離紅色揮擊區域',1.6);sound.burst(.38,.08,90,450);}
     if(melee?.strike&&!inDock()){
       const fx=melee.hit?boat.x:t.x+Math.cos(t.melee.heading)*8,fz=melee.hit?boat.z:t.z-Math.sin(t.melee.heading)*8;
@@ -237,12 +241,12 @@ function updateTargets(dt){
     const turn=melee?.locked?0:clamp(angleDelta(desired,t.yaw),-dt*(t.fleeing?1.9:1.1),dt*(t.fleeing?1.9:1.1));t.yaw+=turn;
     const speed=melee&&(melee.engaged||melee.locked)?melee.speed:t.speed*(t.hostile&&dist<7?.48:1),step=speed*dt;
     const nx=t.x+Math.cos(t.yaw)*step,nz=t.z-Math.sin(t.yaw)*step;
-    let blocked=Math.hypot(nx,nz)>WORLD_RADIUS-5||isHarborSafeZone(nx,nz,t.radius);
+    let blocked=Math.hypot(nx,nz)>WORLD_RADIUS-5||isEnemyPositionRestricted(t,nx,nz);
     for(const o of world.obstacles){const rx=o.rx+t.radius*.55,rz=o.rz+t.radius*.55;if(((nx-o.x)/rx)**2+((nz-o.z)/rz)**2<1){blocked=true;break;}}
     if(blocked&&!melee?.locked)t.yaw+=Math.PI*.65*dt;else if(!blocked){t.x=nx;t.z=nz;}
     const separation=t.radius+PLAYER.radius+.5,overlap=Math.hypot(t.x-boat.x,t.z-boat.z);
     if(overlap<separation){const outward=overlap>.001?{x:(t.x-boat.x)/overlap,z:(t.z-boat.z)/overlap}:right(boat.yaw);t.x=boat.x+outward.x*separation;t.z=boat.z+outward.z*separation;}
-    if(isHarborSafeZone(t.x,t.z,t.radius)){t.x=previousX;t.z=previousZ;}
+    if(isEnemyPositionRestricted(t,t.x,t.z)){t.x=previousX;t.z=previousZ;}
     t.model.group.position.y=0;
     t.model.animate(visualTime+t.patrol*.3,melee?.age);
     const bob=t.model.group.position.y;
@@ -317,7 +321,6 @@ function updateUi(near){
   $('#hurt').style.opacity=String(hitFlash*.40);
   if(visualTime>toastUntil)$('#toast').style.opacity='0';
   drawMinimap();
-  updateTargetLabels();
   const insideVortex=WHIRLPOOLS.some(v=>Math.hypot(boat.x-v.x,boat.z-v.z)<v.radius);
   if(insideVortex){$('#nearest').textContent='漩渦吸引中！張帆並朝外持續加速';}
   $('#boundary-warning').classList.toggle('hidden',phase!=='playing'||Math.hypot(boat.x,boat.z)<188);
@@ -326,7 +329,7 @@ const occlusionProbe=new THREE.PerspectiveCamera();
 function updateCamera(dt){
   const f=forward(boat.yaw),look=new THREE.Vector3(boat.x+f.x*3,0,boat.z+f.z*3);
   occlusionProbe.position.set(boat.x+settings.cameraX,settings.cameraHeight,boat.z+settings.cameraZ);
-  world.occlusion.update(occlusionProbe,renderer,playerModel.position,dt);
+  world.occlusion.update(occlusionProbe,renderer,playerModel.position,dt,true,boat.yaw);
   const desired=new THREE.Vector3(boat.x+settings.cameraX,settings.cameraHeight*world.occlusion.heightMultiplier,boat.z+settings.cameraZ);
   const factor=1-Math.exp(-2.1*dt);camera.position.lerp(desired,factor);
   if(settings.shake&&shakeAmount>.001){camera.position.x+=(Math.random()-.5)*shakeAmount;camera.position.y+=(Math.random()-.5)*shakeAmount*.7;}
@@ -390,6 +393,8 @@ function applyQuality(){
 }
 const labelPosition=new THREE.Vector3();
 function updateTargetLabels(){
+  // Project with this frame's final camera, not the previous render matrix.
+  camera.updateMatrixWorld();
   $('#target-labels').classList.toggle('hidden',phase!=='playing');
   for(const target of targets){
     if(!target.model.loaded){target.label.hidden=true;continue;}
@@ -440,6 +445,7 @@ function frame(now){
 
   for(const cannon of shipParts.cannons){cannon.userData.recoil=Math.max(0,(cannon.userData.recoil||0)-dt*4);cannon.position.z=-cannon.userData.side*Math.sin(cannon.userData.recoil*Math.PI*.5)*.13;}
   shadowTimer-=dt;if(shadowTimer<=0){renderer.shadowMap.needsUpdate=true;shadowTimer=settings.quality==='high'?.033:.10;}
+  updateTargetLabels();
   renderer.render(scene,camera);requestAnimationFrame(frame);
   if(window.pirateStartup?.active)window.pirateStartup.report(world.stats().loaded>0?100:75,world.stats().loaded>0?'Ready to sail':'Building your home port');
   performanceTimer-=dt;if(performanceTimer<=0){performanceTimer=.5;$('#performance').textContent=`${Math.round(smoothedFps)} FPS · 區塊 ${world.stats().loaded}/5 · 近敵 ${targetStreamer.count()} · ${renderer.info.render.calls} draws · ${Math.round(renderer.info.render.triangles/1000)}k 三角形`;$('#performance').classList.toggle('hidden',!settings.stats);}

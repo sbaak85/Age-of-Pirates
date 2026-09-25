@@ -90,9 +90,22 @@ export function isHarborSafeZone(x,z,padding=0){
  const harbor=REGIONS[0].dock,home=(x-harbor.x)**2+(z-harbor.z)**2;
  return REGIONS.slice(1).every(r=>home-((x-r.dock.x)**2+(z-r.dock.z)**2)<=2*padding*Math.hypot(r.dock.x-harbor.x,r.dock.z-harbor.z));
 }
+// Reef uses the same nearest-port boundary as the region HUD; padding excludes the whole body.
+export function isReefKrakenExclusion(x,z,padding=0){
+ const reef=REGIONS.find(r=>r.id==='reef').dock,home=(x-reef.x)**2+(z-reef.z)**2;
+ return REGIONS.filter(r=>r.id!=='reef').every(r=>home-((x-r.dock.x)**2+(z-r.dock.z)**2)<=2*padding*Math.hypot(r.dock.x-reef.x,r.dock.z-reef.z));
+}
+export function isEnemyPositionRestricted(target,x,z){
+ return isHarborSafeZone(x,z,target.radius)||(target.type==='octopus'&&isReefKrakenExclusion(x,z,target.radius));
+}
 export function dockAt(x,z){return REGIONS.find(r=>Math.hypot(x-r.dock.x,z-r.dock.z)<10)||null;}
 export function navigable(x,z,padding=2){return Math.hypot(x,z)<MAP_RADIUS-padding&&!OBSTACLES.some(o=>Math.hypot((x-o.x)/(o.rx+padding),(z-o.z)/(o.rz+padding))<1);}
-export const ENCOUNTERS=REGIONS.flatMap((r,i)=>r.id==='harbor'?[]:['ship','shark','school','ship','submarine','octopus'].map((type,j)=>{
+export const ENCOUNTERS=REGIONS.flatMap((r,i)=>r.id==='harbor'?[]:['ship','shark','school','ship','submarine','octopus'].flatMap((type,j)=>{
+ // Replace only the reef kraken with seven individually tracked sharks.
+ if(r.id==='reef'&&type==='octopus')return Array.from({length:7},(_,n)=>{
+  const p=polar(r.angle+(n-3)*.095, n%2?119:109);
+  return {id:`reef-kraken-shark-${n+1}`,name:`${r.name} · 淺灘鯊魚 ${n+1}`,region:r.id,type:'shark',hp:Math.round(75*(1+(r.tier-1)*.16)),radius:2.3,speed:4,reward:25+r.tier*12,color:0x65576e,hostile:false,fleeing:true,start:[p.x,p.z]};
+ });
  const a=r.angle+(j-2.5)*.15,p=polar(a,j%2?107:115);
  return {id:`${r.id}-${j}`,name:`${r.name} · ${['巡防海盜','尖牙鯊魚','黃金魚群','掠奪艦','銅翼潛艇','赤潮克拉肯'][j]}`,region:r.id,type,hp:Math.round(({ship:100,shark:75,school:60,submarine:115,octopus:180}[type])*(1+(r.tier-1)*.16)),radius:type==='octopus'?4.5:type==='school'?2.7:2.3,speed:type==='school'?4.7:type==='shark'?4:type==='octopus'?1.7:2.7,reward:25+r.tier*12,color:[0xa94635,0x355e72,0x557e80,0x65576e,0x9e6f39][i],hostile:!['shark','school'].includes(type),fleeing:['shark','school'].includes(type),start:[p.x,p.z]};
 }));
