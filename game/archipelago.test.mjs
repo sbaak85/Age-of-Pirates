@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';
-import {REGIONS,ENCOUNTERS,LOOT,WHIRLPOOLS,START,MAP_RADIUS,CORALHAVEN,navigable,whirlpoolForce,upgradeOffer,specialtyOffer} from './archipelago-data.js';
+import {REGIONS,ENCOUNTERS,LOOT,WHIRLPOOLS,START,MAP_RADIUS,CORALHAVEN,REDROCK_SHOALS,REDROCK_GRAND_ARCH,navigable,whirlpoolForce,upgradeOffer,specialtyOffer} from './archipelago-data.js';
 import {createBoatState,stepBoat} from './physics.js';
 import {createWorld} from './world.js';import * as THREE from 'three';
 import {BUILDING_TYPES,buildingTypeFor,villageSlots,createTerrainBase,createVillageBase} from './archipelago-art.js';
@@ -30,6 +30,29 @@ test('every Red Rock island has an intact upper land surface and the forged harb
  }
  const village=createVillageBase(REGIONS.find(r=>r.id==='redrock'));
  assert.ok(village.getObjectByName('赤岩鑄砲村 · 層岩港口'));
+});
+test('grand red-rock arch spans a ship-clear waterway and five cliff feet descend into shallow shelves',()=>{
+ const scene=new THREE.Scene(),world=createWorld(scene),arch=world.far.getObjectByName('赤岩群柱 · 戰門海灣巨型石拱橋');
+ assert.ok(arch,'the large illustrated arch is missing from the playable world');
+ const span=Math.hypot(REDROCK_GRAND_ARCH.to.x-REDROCK_GRAND_ARCH.from.x,REDROCK_GRAND_ARCH.to.z-REDROCK_GRAND_ARCH.from.z);
+ assert.ok(span>60,'the arch must connect the outer pillars and inner cliff across the bay');
+ const body=arch.getObjectByName('連續岩層拱身');assert.ok(body);
+ const vertices=body.geometry.attributes.position,center=Math.floor((vertices.count/8-1)/2)*8;
+ assert.ok(vertices.getY(center+6)>25,'the central soffit must clear a tall ship');
+ for(const u of [.3,.4,.5,.6,.7]){
+  const x=REDROCK_GRAND_ARCH.from.x+(REDROCK_GRAND_ARCH.to.x-REDROCK_GRAND_ARCH.from.x)*u;
+  const z=REDROCK_GRAND_ARCH.from.z+(REDROCK_GRAND_ARCH.to.z-REDROCK_GRAND_ARCH.from.z)*u;
+  assert.ok(navigable(x,z,5),`ship cannot pass beneath the arch at ${u}`);
+ }
+ assert.equal(REDROCK_SHOALS.length,5);
+ for(const shelf of REDROCK_SHOALS){
+  const island=TERRAIN.find(t=>t.seed===shelf.seed),terrain=createTerrainBase(island);
+  const mesh=terrain.getObjectByName(`赤岩淺灘 ${shelf.seed}`);assert.ok(mesh,`missing shoal ${shelf.seed}`);
+  const p=mesh.geometry.attributes.position,stride=13,middle=6;
+  const elevations=[0,2,4,6].map(row=>p.getY(row*stride+middle));
+  assert.ok(elevations.every((height,i)=>i===0||height<elevations[i-1]),`shoal ${shelf.seed} does not slope down from the cliff`);
+  assert.ok(elevations[0]>8&&elevations.at(-1)<0,`shoal ${shelf.seed} does not reach submerged shallows`);
+ }
 });
 test('both Warm Sand channels stay navigable below skyhouses and upper cliff walls face outward',()=>{
  const village=createVillageBase(REGIONS[0]);

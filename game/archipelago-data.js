@@ -37,8 +37,29 @@ for(const region of REGIONS){
 }
 // Two central mountain masses leave an open north/south sea-arch passage.
 TERRAIN.push({x:-30,z:0,rx:20,rz:49,h:39,region:'harbor',seed:51},{x:30,z:0,rx:20,rz:49,h:46,region:'fjord',seed:52});
+// Five authored shelves soften the sea-facing feet marked on the Red Rock
+// preview. Their stone cores have collision; the outer sandy lips sit below
+// wave height and can be sailed across.
+export const REDROCK_SHOALS=Object.freeze([
+ {seed:10,angle:.10,reach:10,arc:.38},
+ {seed:11,angle:.30,reach:8,arc:.33},
+ {seed:14,angle:.85,reach:10,arc:.38},
+ {seed:15,angle:-3.04,reach:10,arc:.38},
+ {seed:17,angle:-2.29,reach:12,arc:.43},
+]);
+const redrockIsland=seed=>TERRAIN.find(t=>t.seed===seed&&t.region==='redrock');
+const outerToInner=(()=>{
+ const from=redrockIsland(14),to=redrockIsland(17),dx=to.x-from.x,dz=to.z-from.z,length=Math.hypot(dx,dz),ux=dx/length,uz=dz/length;
+ const fromRadius=1/Math.hypot(ux/from.rx,uz/from.rz),toRadius=1/Math.hypot(ux/to.rx,uz/to.rz);
+ return {from:{x:from.x+ux*fromRadius*.70,z:from.z+uz*fromRadius*.70},to:{x:to.x-ux*toRadius*.70,z:to.z-uz*toRadius*.70}};
+})();
+export const REDROCK_GRAND_ARCH=Object.freeze({fromSeed:14,toSeed:17,from:outerToInner.from,to:outerToInner.to,clearance:28});
 export const OBSTACLES=TERRAIN.map(t=>({x:t.x,z:t.z,rx:t.rx,rz:t.rz}));
 OBSTACLES.push({x:CORALHAVEN.x,z:CORALHAVEN.z,rx:CORALHAVEN.radius,rz:CORALHAVEN.radius});
+for(const shelf of REDROCK_SHOALS){
+ const t=redrockIsland(shelf.seed),distanceX=t.rx*1.10+shelf.reach*.25,distanceZ=t.rz*1.10+shelf.reach*.25;
+ OBSTACLES.push({x:t.x+Math.cos(shelf.angle)*distanceX,z:t.z+Math.sin(shelf.angle)*distanceZ,rx:4.4+Math.abs(Math.cos(shelf.angle))*1.3,rz:4.4+Math.abs(Math.sin(shelf.angle))*1.3});
+}
 for(const [x,z,w,rot] of [[0,0,22,0],[-151,-65,22,Math.PI/2],[83,123,20,Math.PI/2]])for(const side of [-1,1])OBSTACLES.push({x:x+Math.cos(rot)*side*w/2,z:z-Math.sin(rot)*side*w/2,rx:4.5,rz:4.5});
 for(const r of REGIONS){const u={x:Math.cos(r.angle),z:Math.sin(r.angle)};OBSTACLES.push({x:u.x*141,z:u.z*141,rx:Math.abs(u.x)*7+Math.abs(u.z)*2,rz:Math.abs(u.z)*7+Math.abs(u.x)*2});}
 export const WHIRLPOOLS=[{id:'whirl-1',...polar(3.0,122),radius:11},{id:'whirl-2',...polar(4.28,105),radius:12},{id:'whirl-3',...polar(.2,112),radius:10}];

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import {REGIONS,TERRAIN,WHIRLPOOLS} from './archipelago-data.js';
+import {REGIONS,TERRAIN,WHIRLPOOLS,REDROCK_SHOALS,REDROCK_GRAND_ARCH} from './archipelago-data.js';
 const palette=new Map();
 const material=color=>{if(!palette.has(color))palette.set(color,new THREE.MeshStandardMaterial({color,roughness:.87,flatShading:true}));return palette.get(color);};
 const boxGeo=new THREE.BoxGeometry(1,1,1),stoneGeo=new THREE.CylinderGeometry(.80,1,1,9,1),roofGeo=new THREE.BufferGeometry(),leafGeo=new THREE.IcosahedronGeometry(1,0);
@@ -289,6 +289,43 @@ function addTerrace(g,t,r,i){
  const rock=new THREE.Mesh(geo,material(r.id==='redrock'?(i===0?0xa85d3f:0xc48053):shade(r.rock,i===0?.91:1.05)));rock.position.set(cx,0,cz);rock.castShadow=rock.receiveShadow=true;g.add(rock);
  const cap=new THREE.Mesh(new THREE.ShapeGeometry(new THREE.Shape(outline)),material(r.id==='redrock'?(i%2?0xc99769:0xd1a270):i%2?shade(r.grass,1.13):r.grass));cap.rotation.x=-Math.PI/2;cap.position.set(cx,t.h+rise+.035,cz);cap.castShadow=cap.receiveShadow=true;g.add(cap);
 }
+function addRedrockShallowShelf(g,t,shelf){
+ const radial=[.72,.82,.92,1.02,1.10,1.16,1.19],advance=[0,0,0,.10,.36,.70,1],height=[t.h*.64,t.h*.46,t.h*.29,Math.max(6,t.h*.16),3.7,1.15,-.52];
+ const across=12,rows=radial.length,vertices=[],colors=[],indices=[];
+ const tones=[0x9a5139,0xb66946,0xc88156,0xda9b68,0xe2b887,0xe6c99b,0xd9d3ab];
+ for(let layer=0;layer<2;layer++)for(let k=0;k<rows;k++)for(let j=0;j<=across;j++){
+  const side=j/across*2-1,angle=shelf.angle+side*shelf.arc;
+  const taper=1-.29*side*side,rough=.35*Math.sin(j*3.1+k*2.4+t.seed);
+  const extension=shelf.reach*advance[k]*taper;
+  const x=t.x+Math.cos(angle)*(t.rx*radial[k]+extension+rough),z=t.z+Math.sin(angle)*(t.rz*radial[k]+extension+rough);
+  const y=layer===0?height[k]*(1-.10*side*side)+.13*Math.sin(j*2.6+k*.9+t.seed):-1.8;
+  vertices.push(x,y,z);
+  const tint=new THREE.Color(layer?0x8d6451:tones[k]).multiplyScalar(.94+.065*Math.sin(j*1.9+k*2.3+t.seed));colors.push(tint.r,tint.g,tint.b);
+ }
+ const stride=across+1,bottom=rows*stride;
+ for(let k=0;k<rows-1;k++)for(let j=0;j<across;j++){
+  const a=k*stride+j,b=a+stride;indices.push(a,b,a+1,a+1,b,b+1);
+ }
+ for(let j=0;j<across;j++){
+  const a=(rows-1)*stride+j,b=a+bottom;indices.push(a,b,a+1,a+1,b,b+1);
+ }
+ for(let k=0;k<rows-1;k++)for(const j of [0,across]){
+  const a=k*stride+j,b=a+stride;indices.push(a,a+bottom,b,b,a+bottom,b+bottom);
+ }
+ const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.Float32BufferAttribute(vertices,3));geo.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));geo.setIndex(indices);geo.computeVertexNormals();
+ const mesh=new THREE.Mesh(geo,new THREE.MeshStandardMaterial({color:0xffffff,vertexColors:true,roughness:.96,flatShading:true,side:THREE.DoubleSide}));mesh.name=`赤岩淺灘 ${shelf.seed}`;mesh.castShadow=mesh.receiveShadow=true;g.add(mesh);
+ for(let i=0;i<10;i++){
+  const side=(i%5-2)/2.6,angle=shelf.angle+side*shelf.arc*.85,k=i%3+3;
+  const extension=shelf.reach*advance[k]*(1-.29*side*side);
+  const x=t.x+Math.cos(angle)*(t.rx*radial[k]+extension),z=t.z+Math.sin(angle)*(t.rz*radial[k]+extension),y=height[k];
+  const stone=add(g,cragGeo,i%3===0?0x9e5940:i%2?0xd99f70:0xc17b53,x,y+.36,z,.72+(i%3)*.48,.42+(i%2)*.28,.74+(i%2)*.32);stone.rotation.y=angle+i*.22;
+  if(i%3===0&&y>2)redrockPlant(g,x+Math.sin(angle)*.8,y+.55,z-Math.cos(angle)*.8,i+31,false);
+ }
+ for(let i=0;i<8;i++){
+  const side=(i-3.5)/4,angle=shelf.angle+side*shelf.arc*.9,x=t.x+Math.cos(angle)*(t.rx*1.19+shelf.reach*(1-.29*side*side)),z=t.z+Math.sin(angle)*(t.rz*1.19+shelf.reach*(1-.29*side*side));
+  const foam=add(g,leafGeo,i%3===0?0xd5f2df:0x9fd5cd,x,.10,z,.46+(i%3)*.17,.08,.27+(i%2)*.11);foam.rotation.y=angle;
+ }
+}
 function createRedrockTerrain(t){
  const g=new THREE.Group();g.name=`赤岩群柱 · 手繪石島 ${t.seed}`;
  const village=t.seed===12,n=village?40:32,phase=t.seed*1.73;
@@ -339,6 +376,7 @@ function createRedrockTerrain(t){
   const reef=add(g,cragGeo,i%2?0xd39865:0x9b573d,t.x+Math.cos(a)*t.rx*rad,.05,t.z+Math.sin(a)*t.rz*rad,.80+(i%3)*.23,.55+(i%2)*.17,.70+(i%2)*.22);
   reef.rotation.y=a;reef.rotation.z=(i%3-1)*.12;
  }
+ for(const shelf of REDROCK_SHOALS)if(shelf.seed===t.seed)addRedrockShallowShelf(g,t,shelf);
  if(!village){
   // The crest is intentionally different on each tower island.
   const spires=t.seed===11?4:t.seed===13?2:3;
@@ -852,7 +890,79 @@ export function* detailsForRegion(r){
   house(g,r,0,3.5+j*.35,0,100+(side+1)*4+j,true);g.position.set(p.x+Math.sin(a)*j*4,0,p.z-Math.cos(a)*j*4);g.rotation.y=-a+Math.PI/2+Math.sin(j*3.1+side)*.16;instanceKit(g);yield g;
  }
 }
+function createRedrockGrandArch(){
+ const {from,to,clearance}=REDROCK_GRAND_ARCH,span=Math.hypot(to.x-from.x,to.z-from.z),steps=24;
+ const arch=new THREE.Group();arch.name='赤岩群柱 · 戰門海灣巨型石拱橋';
+ arch.position.set((from.x+to.x)/2,0,(from.z+to.z)/2);arch.rotation.y=-Math.atan2(to.z-from.z,to.x-from.x);
+ arch.userData={fromSeed:REDROCK_GRAND_ARCH.fromSeed,toSeed:REDROCK_GRAND_ARCH.toSeed,span,waterwayClearance:clearance};
+ const positions=[],colors=[],indices=[];
+ const strata=[0xe2a36d,0xc77b50,0xa95a3d,0x874936];
+ for(let i=0;i<=steps;i++){
+  const u=i/steps*2-1,edge=Math.abs(u),bend=(1-edge)*Math.sin(i*1.77)*.48;
+  const x=u*span/2+bend,z=.70*Math.sin(i*.77)*(1-edge);
+  const underneath=15+(clearance-15)*(1-u*u)+.53*Math.sin(i*2.21)*(1-edge);
+  const crown=underneath+6.7+1.8*(1-edge)+.55*Math.sin(i*1.73);
+  const halfDepth=(5.5+2.2*(1-edge)+.43*Math.cos(i*2.3))/2;
+  const levels=[crown,crown-2.1-.42*Math.sin(i*.91),underneath+1.55+.35*Math.sin(i*1.27),underneath];
+  for(let layer=0;layer<4;layer++)for(const face of [-1,1]){
+   const bulge=layer===1?.72:layer===2?.38:-.12;
+   positions.push(x+(layer===1?.26*Math.sin(i*1.31):layer===2?-.22*Math.cos(i*.89):0),levels[layer]+(face===1?.10:0),z+face*(halfDepth+bulge+.17*Math.sin(i*1.53+layer)));
+   const c=new THREE.Color(strata[layer]).multiplyScalar((face===-1?.94:1.07)*(.94+.07*Math.sin(i*2.41+layer*.8)));
+   colors.push(c.r,c.g,c.b);
+  }
+  if(i===steps)continue;
+  const a=i*8,b=a+8;
+  indices.push(a,b,a+1,a+1,b,b+1); // fractured sunlit crown
+  indices.push(a+6,a+7,b+6,a+7,b+7,b+6); // eroded soffit
+  for(let layer=0;layer<3;layer++){
+   const c=a+layer*2,d=b+layer*2;
+   indices.push(c,c+2,d,c+2,d+2,d);
+   indices.push(c+1,d+1,c+3,c+3,d+1,d+3);
+  }
+ }
+ for(const start of [0,steps*8])for(let layer=0;layer<3;layer++){
+  const a=start+layer*2;indices.push(a,a+1,a+2,a+1,a+3,a+2);
+ }
+ const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));geometry.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));geometry.setIndex(indices);geometry.computeVertexNormals();
+ const bridge=new THREE.Mesh(geometry,new THREE.MeshStandardMaterial({color:0xffffff,vertexColors:true,roughness:.96,flatShading:true,side:THREE.DoubleSide}));
+ bridge.name='連續岩層拱身';bridge.castShadow=bridge.receiveShadow=true;arch.add(bridge);
+ // The ends disappear into existing island cliffs. No new pier touches the
+ // open-water channel, so the ship can pass under the central arch.
+ for(const side of [-1,1]){
+  const root=side*span/2;
+  for(let i=0;i<3;i++){
+   const shoulder=add(arch,cragGeo,i===1?0xb36643:i===2?0xd18d5c:0x9c533d,root+side*(i-1)*1.5,15.2+i*3.0,(i-1)*.95,3.0+i*.48,5.5-i*.75,2.65+i*.22);
+   shoulder.rotation.z=side*(.10+i*.045);shoulder.rotation.y=i*.29;
+  }
+  for(let i=0;i<3;i++){
+   const cap=add(arch,cragGeo,i%2?0xc68151:0xe1a36e,root-side*(2+i*1.25),22.5+i*.48,(-1+i)*2.4,1.8,.60,1.48);
+   cap.rotation.y=i*.24;
+  }
+ }
+ for(let i=0;i<18;i++){
+  const u=(i+.5)/18*2-1,edge=Math.abs(u),x=u*span/2,z=(i%2?1:-1)*(1.3+(i%3)*.46);
+  const y=15+(clearance-15)*(1-u*u)+6.4+1.8*(1-edge);
+  const slab=add(arch,cragGeo,i%4===0?0xe6af76:i%2?0xb96b46:0xd4905e,x,y+.25,z,1.55+(i%3)*.46,.38+(i%2)*.14,1.22+(i%2)*.32);slab.rotation.y=i*.31;
+  if(i%4===0){
+   add(arch,leafGeo,i%8===0?0x657f58:0x879163,x,y+.75,z+.72,.82,.29,.69);
+   const fin=add(arch,cragGeo,i%8===0?0xa95d40:0xc77e52,x,y+1.48,z-1.2,.56,1.05,.54);fin.rotation.z=(i%3-1)*.13;
+  }
+ }
+ // Broken, thin sediment ledges interrupt the broad cliff faces without
+ // dropping stone into the navigable opening below the arch.
+ for(let i=2;i<steps-1;i+=2){
+  const u=i/steps*2-1,edge=Math.abs(u),x=u*span/2;
+  const base=15+(clearance-15)*(1-u*u),topY=base+6.7+1.8*(1-edge);
+  for(const face of [-1,1]){
+   const z=face*(3.55+1.1*(1-edge));
+   const ledge=add(arch,cragGeo,i%4===0?0xdfa06a:0xb86b48,x+(i%3-1)*.46,base+(topY-base)*(.42+(i%3)*.10),z,1.6+(i%3)*.32,.25,1.0+(i%2)*.24);
+   ledge.rotation.y=(i%3-1)*.11;
+  }
+ }
+ instanceKit(arch);return arch;
+}
 export function createArches(scene){
+ scene.add(createRedrockGrandArch());
  for(const [x,z,width,y,rot] of [[0,0,22,18,0],[-151,-65,22,19,Math.PI/2],[83,123,20,17,Math.PI/2]]){
   if(x<0){
    const gate=new THREE.Group();gate.name='赤岩群柱 · 天然海蝕拱';gate.position.set(x,0,z);gate.rotation.y=rot;
