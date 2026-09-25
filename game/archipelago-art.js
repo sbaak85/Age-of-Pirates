@@ -57,8 +57,8 @@ export function buildingTypeFor(regionId,slot){
 const shade=(color,multiplier)=>new THREE.Color(color).multiplyScalar(multiplier).getHex();
 function house(g,r,x,y,z,slot,detail){
  const type=buildingTypeFor(r.id,slot),{w,d,h}=type,raised=type.id==='stilt'?1.8:type.id==='cliffhouse'?1.15:0;
- const roofColor=r.id==='harbor'?[0xbf613f,0x537d77,0xd48151,0x8a514b,0x718c83,0xb97449,0x68545a][((slot%7)+7)%7]:slot%7===0?shade(r.roof,.69):slot%4===0?shade(r.roof,1.21):r.roof;
- const skin=r.id==='harbor'?[0xe9d6b2,0xe6c5a0,0xc6b6a1,0xe8d6ba,0x9eb5ac][((slot%5)+5)%5]:[0xe9d6b2,0xc8bc9f,0xe7c6a0,0xd8d1bc][slot%4],timber=slot%3===0?0x704d35:0x916847;
+ const roofColor=r.id==='harbor'?[0xbf613f,0x537d77,0xd48151,0x8a514b,0x718c83,0xb97449,0x68545a][((slot%7)+7)%7]:r.id==='redrock'?[0x386b70,0xb55e42,0xc98951,0x596c5a,0x8f493f,0x456d6d,0xd09b62][((slot%7)+7)%7]:slot%7===0?shade(r.roof,.69):slot%4===0?shade(r.roof,1.21):r.roof;
+ const skin=r.id==='harbor'?[0xe9d6b2,0xe6c5a0,0xc6b6a1,0xe8d6ba,0x9eb5ac][((slot%5)+5)%5]:r.id==='redrock'?[0xe5bb86,0xd89e6c,0xc78358,0xe7c39b,0xb36e4d][((slot%5)+5)%5]:[0xe9d6b2,0xc8bc9f,0xe7c6a0,0xd8d1bc][slot%4],timber=r.id==='redrock'?0x5e4034:slot%3===0?0x704d35:0x916847;
  const baseY=y+raised,top=baseY+h+.5,halfD=d/2,halfW=w/2;
  // Silhouette and roof survive as low-detail village landmarks.
  if(type.id==='lighthouse'){
@@ -150,6 +150,20 @@ function house(g,r,x,y,z,slot,detail){
    for(let k=0;k<3;k++)add(g,leafGeo,k%2?0x6b985f:0x8bb276,x+side*.92+(k-1)*.20,baseY+h*.38,z+halfD+.36,.24,.32,.25);
   }
  }
+ if(r.id==='redrock'&&type.id!=='lighthouse'){
+  const trim=slot%2?0x477576:0xbd784f;
+  for(const side of [-1,1]){
+   box(g,trim,x+side*Math.min(w*.25,.95),baseY+h*.61,z+halfD+.29,.16,.97,.12);
+   box(g,0x76513b,x+side*Math.min(w*.25,.95),baseY+h*.32,z+halfD+.33,.85,.18,.43);
+   for(let i=0;i<3;i++)add(g,leafGeo,i===1?0xd9a15c:0x708a56,x+side*Math.min(w*.25,.95)+(i-1)*.22,baseY+h*.38,z+halfD+.40,.21,.21,.22);
+  }
+  const canopy=box(g,slot%3===0?0xc3794b:0x6b8d84,x,baseY+2.26,z+halfD+1.11,w*.78,.14,1.32);canopy.rotation.x=-.13;
+  box(g,0xd5aa72,x,baseY+.25,z+halfD+1.45,w*.82,.12,1.24);
+  if(type.id==='forge'||type.id==='warehouse'){
+   box(g,0x654b3c,x+halfW*.62,top+.92,z-.42,.85,2.1,.83);
+   box(g,0xe9a65b,x-halfW*.42,baseY+.85,z+halfD+.25,.82,.7,.18);
+  }
+ }
  return type;
 }
 function sideOffset(i,w){return (i-1.5)*w*.23;}
@@ -167,6 +181,7 @@ export function villageSlots(r,rows=3){
 }
 function tree(g,x,y,z,seed,r,central=false){
  if(r.id==='harbor'){harborPlant(g,x,y,z,seed,central);return;}
+ if(r.id==='redrock'){redrockPlant(g,x,y,z,seed,central);return;}
  const tall=central?6+(seed%4)*.75:3.7+(seed%3)*.7;
  const trunk=add(g,trunkGeo,0x76543b,x,y+tall*.5,z,central?.52:.32,tall,central?.52:.32);
  trunk.rotation.z=(seed%3-1)*.045;
@@ -181,6 +196,47 @@ function tree(g,x,y,z,seed,r,central=false){
  }else{
   add(g,leafGeo,0x6aa261,x,y+tall+.28,z,.72,.6,.72);
   for(let k=0;k<6;k++){const angle=k*Math.PI/3+seed*.13;const leaf=add(g,leafGeo,r.grass,x+Math.cos(angle)*1.05,y+tall+.1+Math.sin(k*2)*.16,z+Math.sin(angle)*1.05,1.55,.32,.58);leaf.rotation.y=-angle;leaf.rotation.z=Math.cos(angle)*.18;}
+ }
+}
+function redrockPlant(g,x,y,z,seed,central=false){
+ const kind=((seed*7+(central?2:0))%5+5)%5,deep=0x416e58,olive=0x668d58,lime=0x9dad63;
+ if(kind===0){ // Flat, wind-shaped acacia crown.
+  const h=central?6.6:4.8+(seed%3)*.45;
+  const trunk=add(g,trunkGeo,0x74543d,x,y+h*.48,z,.23,h,.23);trunk.rotation.z=.10;
+  for(let i=0;i<4;i++){
+   const a=i*2.399+seed*.43,reach=1.25+(i%2)*.5;
+   const limb=add(g,trunkGeo,0x76563e,x+Math.cos(a)*reach*.35,y+h*.87,z+Math.sin(a)*reach*.35,.10,reach*1.0,.10);limb.rotation.z=Math.cos(a)*.61;limb.rotation.x=-Math.sin(a)*.61;
+   const crown=add(g,leafGeo,i%2?deep:olive,x+Math.cos(a)*reach,y+h+.25+(i%2)*.18,z+Math.sin(a)*reach,1.5,.48,1.35);crown.rotation.y=a;
+  }
+ }else if(kind===1){ // Fan palm at the lower, wetter shelves.
+  const h=central?6.0:4.3;
+  const trunk=add(g,trunkGeo,0x856543,x,y+h*.5,z,.23,h,.23);trunk.rotation.z=-.10;
+  for(let i=0;i<7;i++){
+   const a=i*Math.PI*2/7+seed*.2;
+   const frond=add(g,leafGeo,i%3===0?lime:olive,x+Math.cos(a)*1.32,y+h+.08-(i%2)*.15,z+Math.sin(a)*1.32,1.52,.17,.43);
+   frond.rotation.y=-a;frond.rotation.z=-.16;
+  }
+ }else if(kind===2){ // Blue-green agave, separate curved blades and flowering stalk.
+  for(let i=0;i<8;i++){
+   const a=i*Math.PI/4+seed*.19;
+   const blade=add(g,coneGeo,i%2?0x5b8a75:0x83a18a,x+Math.cos(a)*.37,y+.66,z+Math.sin(a)*.37,.31,1.35,.31);
+   blade.rotation.z=Math.cos(a)*.49;blade.rotation.x=-Math.sin(a)*.49;
+  }
+  add(g,trunkGeo,0x77865d,x,y+1.22,z,.07,2.1,.07);
+  for(let i=0;i<3;i++)add(g,leafGeo,0xe7b06e,x+Math.cos(i*2.1)*.21,y+2.20,z+Math.sin(i*2.1)*.21,.19,.2,.19);
+ }else if(kind===3){ // Multi-stem red-rock juniper.
+  const h=central?5.1:3.8;
+  for(let i=0;i<3;i++){
+   const a=i*2.1+seed*.12;
+   const stem=add(g,trunkGeo,0x755440,x+Math.cos(a)*.24,y+h*.43,z+Math.sin(a)*.24,.17,h*.86,.17);stem.rotation.z=Math.cos(a)*.17;
+   add(g,leafGeo,i%2?0x3e6b59:0x597d5e,x+Math.cos(a)*.66,y+h+(i%2)*.23,z+Math.sin(a)*.66,1.07,1.12,.96);
+  }
+ }else{ // Orange desert flower on low, irregular sage shrubs.
+  for(let i=0;i<5;i++){
+   const a=i*2.399+seed*.27;
+   add(g,leafGeo,i%2?olive:deep,x+Math.cos(a)*.52,y+.45+(i%2)*.2,z+Math.sin(a)*.48,.62,.38,.55);
+   if(i%2===0)add(g,leafGeo,i===0?0xe9ad66:0xc66d4f,x+Math.cos(a)*.65,y+.86+(i%2)*.2,z+Math.sin(a)*.55,.16,.18,.16);
+  }
  }
 }
 function harborPlant(g,x,y,z,seed,central=false){
@@ -219,9 +275,9 @@ function addTerrace(g,t,r,i){
  const a=t.seed*2.41+i*2.31,outer=i===0?.20:.34;
  const cx=t.x+Math.cos(a)*t.rx*outer,cz=t.z+Math.sin(a)*t.rz*outer;
  const rx=t.rx*(i===0?.50:.29),rz=t.rz*(i===0?.48:.31),rise=Math.min(8,t.h*(i===0?.24:.16))+(r.id==='redrock'?2:0);
- const n=18,rings=[[t.h-.22,1.12],[t.h+rise*.34,1.05],[t.h+rise*.68,.94],[t.h+rise,.84]],pos=[],idx=[],outline=[];
+ const n=r.id==='redrock'?23:18,rings=r.id==='redrock'?[[t.h-.22,1.17],[t.h+rise*.20,1.11],[t.h+rise*.38,.98],[t.h+rise*.67,.98],[t.h+rise*.78,.86],[t.h+rise,.85]]:[[t.h-.22,1.12],[t.h+rise*.34,1.05],[t.h+rise*.68,.94],[t.h+rise,.84]],pos=[],idx=[],outline=[];
  for(let k=0;k<rings.length;k++)for(let j=0;j<n;j++){
-  const angle=j/n*Math.PI*2,noise=1+.09*Math.sin(angle*5+a)+.045*Math.cos(angle*8-a*.7),rad=rings[k][1]*noise;
+  const angle=j/n*Math.PI*2,noise=1+.09*Math.sin(angle*5+a)+.045*Math.cos(angle*8-a*.7)+(r.id==='redrock'?.045*Math.sin(angle*11+a*.31):0),rad=rings[k][1]*noise;
   const x=Math.cos(angle)*rx*rad,z=Math.sin(angle)*rz*rad;pos.push(x,rings[k][0],z);
   if(k===rings.length-1)outline.push(new THREE.Vector2(x,-z));
  }
@@ -230,8 +286,87 @@ function addTerrace(g,t,r,i){
  // and the upper grassy cap looking suspended from a low camera angle.
  for(let k=0;k<rings.length-1;k++)for(let j=0;j<n;j++){const p=k*n+j,q=k*n+(j+1)%n;idx.push(p,p+n,q,q,p+n,q+n);}
  const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));geo.setIndex(idx);geo.computeVertexNormals();
- const rock=new THREE.Mesh(geo,material(shade(r.rock,i===0?.91:1.05)));rock.position.set(cx,0,cz);rock.castShadow=rock.receiveShadow=true;g.add(rock);
- const cap=new THREE.Mesh(new THREE.ShapeGeometry(new THREE.Shape(outline)),material(i%2?shade(r.grass,1.13):r.grass));cap.rotation.x=-Math.PI/2;cap.position.set(cx,t.h+rise+.035,cz);cap.castShadow=cap.receiveShadow=true;g.add(cap);
+ const rock=new THREE.Mesh(geo,material(r.id==='redrock'?(i===0?0xa85d3f:0xc48053):shade(r.rock,i===0?.91:1.05)));rock.position.set(cx,0,cz);rock.castShadow=rock.receiveShadow=true;g.add(rock);
+ const cap=new THREE.Mesh(new THREE.ShapeGeometry(new THREE.Shape(outline)),material(r.id==='redrock'?(i%2?0xc99769:0xd1a270):i%2?shade(r.grass,1.13):r.grass));cap.rotation.x=-Math.PI/2;cap.position.set(cx,t.h+rise+.035,cz);cap.castShadow=cap.receiveShadow=true;g.add(cap);
+}
+function createRedrockTerrain(t){
+ const g=new THREE.Group();g.name=`赤岩群柱 · 手繪石島 ${t.seed}`;
+ const village=t.seed===12,n=village?40:32,phase=t.seed*1.73;
+ const rings=village?[[-1.45,1.10],[-.12,1.04],[.78,.99],[1.55,.97],[2.55,.91],[3.6,.94],[4.35,.87],[t.h-.16,.88],[t.h,.88]]:[[-1.7,1.16],[-.22,1.09],[t.h*.12,1.01],[t.h*.24,.97],[t.h*.32,1.005],[t.h*.40,.94],[t.h*.48,.88],[t.h*.57,.91],[t.h*.64,.84],[t.h*.73,.82],[t.h*.79,.86],[t.h*.86,.79],[t.h*.92,.76],[t.h-.16,.78],[t.h,.78]];
+ const pos=[],col=[],idx=[],outline=[];
+ const tones=[0xa74d37,0xca6744,0xe08a52,0xeeae72,0x994331,0xc6744d,0xd98e58],deep=new THREE.Color(0x804335);
+ for(let k=0;k<rings.length;k++)for(let j=0;j<n;j++){
+  const a=j/n*Math.PI*2;
+  // One continuous crooked contour runs through every coloured stratum. A
+  // repeated perfect cylinder would erase the illustrated cliff silhouette.
+  const scallop=1+.082*Math.sin(a*3+phase)+.051*Math.cos(a*5-phase*.57)+.031*Math.sin(a*9+phase*.31)+.018*Math.cos(a*13-phase);
+  const local=scallop*(1+.018*Math.sin(k*2.7+a*4.1+phase));
+  const x=Math.cos(a)*t.rx*rings[k][1]*local,z=Math.sin(a)*t.rz*rings[k][1]*local;
+  pos.push(x,rings[k][0]+(village?0:.22*Math.sin(a*7+k*.7+phase)),z);
+  const band=k<2?deep:new THREE.Color(tones[(Math.floor(k/2)+Math.floor(j/5)+t.seed)%tones.length]);
+  const color=band.clone().multiplyScalar(.88+.075*Math.sin(a*4+phase)+.035*(k%2));
+  col.push(color.r,color.g,color.b);
+  if(k===rings.length-1)outline.push(new THREE.Vector2(x,-z));
+ }
+ for(let k=0;k<rings.length-1;k++)for(let j=0;j<n;j++){
+  const a=k*n+j,b=k*n+(j+1)%n;idx.push(a,b,a+n,b,b+n,a+n);
+ }
+ const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));geo.setAttribute('color',new THREE.Float32BufferAttribute(col,3));geo.setIndex(idx);geo.computeVertexNormals();
+ const wall=new THREE.Mesh(geo,new THREE.MeshStandardMaterial({color:0xffffff,vertexColors:true,roughness:.96,flatShading:true,side:THREE.DoubleSide}));wall.position.set(t.x,0,t.z);wall.castShadow=wall.receiveShadow=true;g.add(wall);
+ const cap=new THREE.Mesh(new THREE.ShapeGeometry(new THREE.Shape(outline)),material(village?0xd2b17e:t.seed%2?0xd1a371:0xc59364));cap.rotation.x=-Math.PI/2;cap.position.set(t.x,t.h+.05,t.z);cap.castShadow=cap.receiveShadow=true;g.add(cap);
+ if(!village)for(let i=0;i<2;i++)addTerrace(g,t,REGIONS[1],i);
+ for(let i=0;i<(village?23:16);i++){
+  const a=i*2.399+phase*.38,rad=.17+(i%5)*.11;
+  const px=t.x+Math.cos(a)*t.rx*rad,pz=t.z+Math.sin(a)*t.rz*rad;
+  const patch=add(g,leafGeo,i%4===0?0x759066:i%3===0?0x9ba36b:0x877f59,px,t.h+.12,pz,1.0+(i%3)*.4,.10,1.2+(i%2)*.39);patch.rotation.y=a;
+  if(i%3===0)add(g,cragGeo,i%2?0xdda16a:0xa76042,px+Math.sin(a)*1.15,t.h+.28,pz-Math.cos(a)*1.15,.7,.31,.58);
+ }
+ // Angular shelves, eroded ribs and detached shoal rocks are composed per
+ // island. All stay within the existing physics footprint and leave channels.
+ for(let i=0;i<(village?14:18);i++){
+  const a=i*2.399+phase,rad=.67+(i%4)*.055;
+  const x=t.x+Math.cos(a)*t.rx*rad,z=t.z+Math.sin(a)*t.rz*rad;
+  const h=village?1.5+(i%3)*.85:t.h*(.18+(i%4)*.13);
+  const rib=add(g,cragGeo,i%5===0?0xe0a36d:i%2?0x9a523c:0xc47b50,x,h,z,1.25+(i%3)*.38,village?.9:t.h*.085,1.0+(i%2)*.33);
+  rib.rotation.y=a*.62;rib.rotation.z=(i%3-1)*.065;
+  if(i%2===0){
+   const ledge=add(g,cragGeo,i%4===0?0xda9a66:0xb66a47,x+Math.cos(a)*.45,h+1.0,z+Math.sin(a)*.45,1.65+(i%3)*.40,.35,1.23+(i%2)*.26);ledge.rotation.y=a;
+  }
+  const shore=add(g,cragGeo,i%3===0?0xe1af79:0xa86144,t.x+Math.cos(a)*t.rx*(.86+(i%2)*.045),.15,t.z+Math.sin(a)*t.rz*(.86+(i%2)*.045),1.14+(i%3)*.32,.78+(i%2)*.22,.84+(i%2)*.25);shore.rotation.y=a;
+ }
+ for(let i=0;i<6;i++){
+  const a=i*2.399+phase*.63,rad=1.02+(i%3)*.035;
+  const reef=add(g,cragGeo,i%2?0xd39865:0x9b573d,t.x+Math.cos(a)*t.rx*rad,.05,t.z+Math.sin(a)*t.rz*rad,.80+(i%3)*.23,.55+(i%2)*.17,.70+(i%2)*.22);
+  reef.rotation.y=a;reef.rotation.z=(i%3-1)*.12;
+ }
+ if(!village){
+  // The crest is intentionally different on each tower island.
+  const spires=t.seed===11?4:t.seed===13?2:3;
+  for(let i=0;i<spires;i++){
+   const a=i*2.399+t.seed*.31,rad=i===0?.12:.34,high=8+(i%3)*3.8+(t.seed%3)*1.8;
+   const x=t.x+Math.cos(a)*t.rx*rad,z=t.z+Math.sin(a)*t.rz*rad;
+   for(let k=0;k<3;k++){
+    const part=add(g,cragGeo,k===1?0xa85a3f:k===2?0xe0a16e:0xbf754d,x+(k%2)*.22,t.h+high*(k+.5)/3,z-(k%2)*.14,2.15-k*.17,high/6+.13,1.75-k*.12);part.rotation.y=a+k*.23;
+   }
+   const crown=add(g,cragGeo,i%2?0xe4a46d:0xc37a4d,x+(i%2)*.21,t.h+high+.48,z,1.35,1.4,1.17);crown.rotation.z=(i%2?1:-1)*.13;
+  }
+  for(let i=0;i<4;i++){
+   const a=i*2.399+phase*.43,rad=.43+(i%2)*.11;
+   const fin=add(g,cragGeo,i%2?0xa7553e:0xce8255,t.x+Math.cos(a)*t.rx*rad,t.h*.79,t.z+Math.sin(a)*t.rz*rad,2.5+(i%2)*.6,t.h*.18,2.0+(i%2)*.45);
+   fin.rotation.z=(i%2?1:-1)*.14;fin.rotation.y=a;
+  }
+ }
+ if(t.seed===11){
+  // A narrow turquoise fall breaks the warm cliff mass without a costly
+  // simulation. Its pale foam makes the landing point readable from sea.
+  const a=REGIONS[1].angle+Math.PI,edge=.76,fx=t.x+Math.cos(a)*t.rx*edge,fz=t.z+Math.sin(a)*t.rz*edge;
+  const fallMat=new THREE.MeshStandardMaterial({color:0x9fe0d6,roughness:.28,transparent:true,opacity:.73,depthWrite:false,side:THREE.DoubleSide});
+  for(let i=-1;i<=1;i++){
+   const m=new THREE.Mesh(boxGeo,fallMat);m.position.set(fx+Math.cos(a+Math.PI/2)*i*.66,t.h*.43,fz+Math.sin(a+Math.PI/2)*i*.66);m.scale.set(.57,t.h*.72,.20);m.rotation.y=-a;m.renderOrder=5;g.add(m);
+  }
+  for(let i=0;i<6;i++){const aa=i*2.399,foam=add(g,leafGeo,i%2?0xdaf4df:0x87c9c8,fx+Math.cos(aa)*1.5,.45,fz+Math.sin(aa)*1.25,.85,.33,.65);foam.rotation.y=aa;}
+ }
+ instanceKit(g);return g;
 }
 function addRegionalLandmark(g,t,r){
  if(t.seed>=50||t.seed%10!==1)return;
@@ -273,6 +408,7 @@ function addRegionalLandmark(g,t,r){
 }
 export function createTerrainBase(t){
  const g=new THREE.Group(),r=REGIONS.find(r=>r.id===t.region);g.name=`${r.name} cliff ${t.seed}`;
+ if(r.id==='redrock')return createRedrockTerrain(t);
  // A single shared contour through every stratum prevents the offset, rotated-column look.
  const harbor=r.id==='harbor',n=harbor?48:24,phase=t.seed*1.73;
  const rings=harbor?[[-1.35,1.06],[-.28,1.015],[.18,.97],[t.h*.14,.95],[t.h*.28,.90],[t.h*.43,.88],[t.h*.55,.90],[t.h*.70,.84],[t.h*.84,.83],[t.h-.18,.79],[t.h,.785]]:[[-1.25,1.10],[.15,1.015],[t.h*.20,.99],[t.h*.40,.91],[t.h*.61,.94],[t.h*.82,.855],[t.h-.15,.79],[t.h,.77]];
@@ -477,10 +613,100 @@ function createHarborSkyhouse(mainlandSeed,isletSeed){
  consolidateChunk(g);
  return g;
 }
+function createRedrockPort(r){
+ const port=new THREE.Group();port.name='赤岩鑄砲村 · 層岩港口';
+ port.position.set(r.dock.x,0,r.dock.z);port.rotation.y=Math.PI/2-r.angle;
+ const sandstone=0xb97950,light=0xd7a473,dark=0x80513e,plank=0x98704a,iron=0x38494b,bronze=0xb78552;
+ // Three staggered stone quays make a compact harbour inside the navigation
+ // corridor. Their approach is open to the sea, not blocked by a breakwater.
+ for(let i=0;i<3;i++){
+  const z=3+i*5.9,width=24+i*5;
+  box(port,i%2?0xb26c47:sandstone,0,.82,z,width,1.60,5.2);
+  box(port,light,0,1.68,z,width+.2,.18,5.35);
+  for(let j=0;j<Math.floor(width/1.2);j++){
+   const x=-width/2+.7+j*1.2;
+   box(port,j%5===0?0xe0b383:0xb98255,x,1.79,z,1.04,.07,5.09);
+  }
+  for(const side of [-1,1])for(let j=0;j<3;j++){
+   const x=side*(width/2-.45),zz=z+(j-1)*1.65;
+   const bollard=add(port,stoneGeo,j%2?0xd6a06e:dark,x,2.12,zz,.32,.75,.32);bollard.rotation.y=j*.23;
+  }
+ }
+ for(const side of [-1,1]){
+  const x=side*11.6;
+  box(port,dark,x,.92,-7.0,3.3,.30,17.5);
+  for(let i=0;i<20;i++)box(port,i%4===0?0xc89561:plank,x,1.12,-15+i*.83,3.17,.08,.68);
+  for(let i=0;i<6;i++){
+   box(port,dark,x+side*1.42,.15,-14+i*2.7,.32,2.4,.32);
+   box(port,iron,x+side*1.42,1.70,-14+i*2.7,.43,.12,.43);
+  }
+  // Raised side workshops are visibly anchored by piles and diagonal braces.
+  const terraceX=side*12.1;
+  box(port,0x9a6044,terraceX,2.52,12.3,11.5,1.1,8.8);
+  box(port,0xd9aa78,terraceX,3.14,12.3,11.8,.18,9.0);
+  for(const sx of [-1,1])for(const zz of [8.8,15.8]){
+   box(port,dark,terraceX+sx*4.75,1.1,zz,.45,2.2,.45);
+   const brace=box(port,plank,terraceX+sx*3.2,1.25,zz,.20,2.9,.20);brace.rotation.z=sx*.62;
+  }
+  const workshop=new THREE.Group();house(workshop,r,0,3.2,0,side<0?5:6,true);workshop.position.set(terraceX,0,12.3);workshop.rotation.y=Math.PI+(side<0?-.23:.20);workshop.scale.setScalar(1.14);port.add(workshop);
+  for(let i=0;i<4;i++){
+   const xx=terraceX+(i-1.5)*2.2;
+   add(port,stoneGeo,i%2?0x5c5d50:0x6a6658,xx,3.50,8.0,.43,.67,.43);
+   box(port,iron,xx,3.9,8.0,.58,.12,.58);
+  }
+ }
+ const chandlery=new THREE.Group();house(chandlery,r,0,5.35,0,18,true);chandlery.position.set(2.8,0,23.2);chandlery.rotation.y=Math.PI+.09;chandlery.scale.setScalar(1.2);port.add(chandlery);
+ for(let i=0;i<8;i++){
+  const x=-6.2+i*1.8,z=19+(i%2)*1.5;
+  box(port,i%3===0?0xb76046:0x6d8e86,x,6.26,z,.92,.12,1.20);
+  box(port,dark,x,5.68,z,.12,1.08,.12);
+ }
+ // A high, hand-built forge balcony with glowing mouth and red sandstone
+ // retaining wall. The village still uses the existing dock trigger.
+ for(let i=0;i<10;i++){
+  const x=-15+i*3.3;
+  add(port,cragGeo,i%3===0?0xd29865:i%2?0x9e5a3f:0xbd7952,x,2.45,24.2,1.35,2.4,1.35);
+  box(port,dark,x,5.05,24.0,.25,.19,2.25);
+ }
+ box(port,0x86533d,0,5.17,24.3,32.5,.25,4.6);
+ for(let i=-9;i<=9;i++)box(port,i%4===0?0xc89565:plank,i*1.7,5.35,24.3,1.46,.08,4.46);
+ for(const side of [-1,1]){
+  box(port,dark,side*15.9,6.0,24.3,.16,1.3,4.8);
+  for(let i=0;i<5;i++)box(port,bronze,side*15.9,6.79,22.1+i*1.1,.25,.22,.25);
+ }
+ // Uneven ramp, grain-by-grain steps and scattered dock cargo.
+ for(let i=0;i<13;i++){
+  const z=25.8+i*.93,y=2.0+i*.28;
+  box(port,i%3===0?light:0xbe8159,0,y,z,4.8,.38,.94);
+  if(i%3===0)add(port,cragGeo,0xa15f43,3.1,y-.22,z,.56,.5,.53);
+ }
+ for(let i=0;i<18;i++){
+  const side=i%2?1:-1,x=side*(2.5+(i%4)*1.2),z=-1+(i%8)*2.6;
+  if(i%3===0)add(port,stoneGeo,0xa46f49,x,2.2,z,.45,.85,.45);
+  else box(port,i%4===0?iron:0xac8154,x,2.12,z,.75,.69,.8);
+  if(i%5===0)box(port,bronze,x,2.56,z,.78,.08,.82);
+ }
+ // Yard crane: its chain and hanging ore bucket give the harbour a strong
+ // industrial silhouette without animated joints or per-frame allocations.
+ box(port,dark,-8.4,6.1,20.4,.75,9.3,.75);
+ box(port,plank,-4.1,10.0,20.4,10.0,.38,.55);
+ const diagonal=box(port,dark,-6.25,7.65,20.4,.23,5.2,.23);diagonal.rotation.z=-.72;
+ box(port,iron,.20,7.85,20.4,.10,4.1,.10);
+ add(port,stoneGeo,0x575651,.20,5.55,20.4,.70,.85,.72);
+ for(let i=0;i<4;i++)add(port,leafGeo,i%2?0xdb9b58:0x765d44,-8.2+i*.44,10.35,20.4,.18,.22,.20);
+ // Varied vegetation grows in pockets between rock and timber, not in rows.
+ for(let i=0;i<14;i++){
+  const a=i*2.399,side=i%2?1:-1;
+  redrockPlant(port,side*(14+(i%3)*2.3),i%3===0?5.35:1.7,8+(i%6)*4.1,14+i,false);
+  if(i%3===0)add(port,cragGeo,i%2?0xc68455:0x95563e,side*(12+(i%4)*2.4),2.0,7+(i%6)*4,1.1,.9,.9);
+ }
+ consolidateChunk(port);return port;
+}
 export function createVillageBase(r){
  const g=new THREE.Group();g.name=r.village;const homes=new THREE.Group();g.add(homes);g.userData.homes=homes;const u={x:Math.cos(r.angle),z:Math.sin(r.angle)},v={x:-u.z,z:u.x};
  for(const s of villageSlots(r,2)){const h=new THREE.Group();house(h,r,0,s.y,0,s.slot,false);h.position.set(s.x,0,s.z);h.rotation.y=s.heading;homes.add(h);}
  if(r.id==='harbor')g.add(createHarborPort(r),createHarborSkyhouse(1,0),createHarborSkyhouse(3,4));
+ else if(r.id==='redrock')g.add(createRedrockPort(r));
  else{
   const dock=box(g,0xb38b58,u.x*140,1.1,u.z*140,5,.5,18);dock.rotation.y=-r.angle+Math.PI/2;
   for(let k=0;k<5;k++)for(const s of [-1,1])box(g,0x70533d,u.x*(133+k*3)+v.x*s*2.1,.25,u.z*(133+k*3)+v.z*s*2.1,.3,2.5,.3);
@@ -494,13 +720,25 @@ export function* detailsForRegion(r){
   const g=new THREE.Group();house(g,r,0,s.y,0,s.slot,true);g.position.set(s.x,0,s.z);g.rotation.y=s.heading;instanceKit(g);yield g;
  }
  for(const t of TERRAIN.filter(t=>t.region===r.id)){
-  for(let i=0;i<(t.seed>=51?22:r.id==='harbor'?t.seed===0?14:12:8);i++){
+  for(let i=0;i<(t.seed>=51?22:r.id==='harbor'?t.seed===0?14:12:r.id==='redrock'?14:8);i++){
    const g=new THREE.Group(),central=t.seed>=51,a=central?i*2.399+t.seed:i*2.4+t.seed;
    const rad=central?.14+(i%7)*.067:r.id==='harbor'?(t.seed===0?.57+(i%3)*.065:.24+(i%4)*.115):.3+(i%3)*.12;
    tree(g,t.x+Math.cos(a)*t.rx*rad,t.h+.6,t.z+Math.sin(a)*t.rz*rad,i,r,central);
    // Vertical flank facets and low shoreline boulders, never protruding into the collision corridor.
-   for(let k=0;k<4;k++){const b=add(g,stoneGeo,k%2?r.rock:new THREE.Color(r.rock).multiplyScalar(.84).getHex(),t.x+Math.cos(a)*t.rx*(.73-k*.05),t.h*(.12+k*.21),t.z+Math.sin(a)*t.rz*(.73-k*.05),(t.seed>=51?Math.min(t.rx,t.rz)*.21:t.rx*.28),t.h*.19,(t.seed>=51?Math.min(t.rx,t.rz)*.21:t.rz*.24));b.rotation.y=t.seed>=51?0:a+k*.11;}
-   const shore=add(g,leafGeo,r.rock,t.x+Math.cos(a)*t.rx*.92,.15,t.z+Math.sin(a)*t.rz*.92,1.6,1.0,1.2);shore.rotation.y=a;
+   if(r.id==='redrock'){
+    for(let k=0;k<3;k++){
+     const rib=add(g,cragGeo,k===1?0xdf9c67:k===2?0xa45b3f:0xbf7850,t.x+Math.cos(a)*t.rx*(.72-k*.045),t.h*(.21+k*.24),t.z+Math.sin(a)*t.rz*(.72-k*.045),1.28+(i%3)*.34,t.h*.065,1.1+(i%2)*.29);
+     rib.rotation.y=a+k*.26;rib.rotation.z=(i%3-1)*.07;
+    }
+    if(t.h>10&&i%2===0){
+     const lx=t.x+Math.cos(a)*t.rx*.77,lz=t.z+Math.sin(a)*t.rz*.77,ly=t.h*(.31+(i%3)*.14);
+     const shelf=add(g,cragGeo,i%3?0xc48255:0xe0a16e,lx,ly,lz,1.65,.48,1.4);shelf.rotation.y=a;
+     redrockPlant(g,lx,ly+.63,lz,i+22,false);
+    }
+   }else{
+    for(let k=0;k<4;k++){const b=add(g,stoneGeo,k%2?r.rock:new THREE.Color(r.rock).multiplyScalar(.84).getHex(),t.x+Math.cos(a)*t.rx*(.73-k*.05),t.h*(.12+k*.21),t.z+Math.sin(a)*t.rz*(.73-k*.05),(t.seed>=51?Math.min(t.rx,t.rz)*.21:t.rx*.28),t.h*.19,(t.seed>=51?Math.min(t.rx,t.rz)*.21:t.rz*.24));b.rotation.y=t.seed>=51?0:a+k*.11;}
+   }
+   const shore=add(g,leafGeo,r.id==='redrock'?(i%2?0xd99c6b:0x98563f):r.rock,t.x+Math.cos(a)*t.rx*.92,.15,t.z+Math.sin(a)*t.rz*.92,1.6,1.0,1.2);shore.rotation.y=a;
    if(r.id==='harbor'&&t.h>10&&i%3===0){
     const ledgeY=t.h*(.43+(i%2)*.14),lx=t.x+Math.cos(a)*t.rx*.82,lz=t.z+Math.sin(a)*t.rz*.82;
     const ledge=add(g,cragGeo,i%2?0xa78d6d:0xc9b38e,lx,ledgeY,lz,2.2,1.35,1.8);ledge.rotation.y=a;
@@ -545,6 +783,35 @@ export function* detailsForRegion(r){
    for(let j=0;j<3;j++){const branch=add(scatter,stoneGeo,j%2?0xe1987c:0xf0bd91,x+(j-1)*.25,.55+j*.10,z,.09,1.15+j*.21,.10);branch.rotation.z=(j-1)*.28;}
   }
   instanceKit(scatter);yield scatter;
+  if(r.id==='redrock'&&t.seed===12){
+   const foundry=new THREE.Group(),u={x:Math.cos(r.angle),z:Math.sin(r.angle)},v={x:-u.z,z:u.x};
+   for(const [side,slot] of [[-1,6],[1,3]]){
+    const x=t.x+u.x*10+v.x*side*8,z=t.z+u.z*10+v.z*side*8;
+    const home=new THREE.Group();house(home,r,0,t.h+.14,0,slot,true);home.position.set(x,0,z);home.rotation.y=-r.angle+Math.PI/2+side*.15;foundry.add(home);
+    add(foundry,cragGeo,side<0?0xc88554:0xa75d3f,x,t.h-.40,z,3.25,.54,2.8);
+   }
+   for(let i=0;i<13;i++){
+    const a=i*2.399,x=t.x+u.x*(5+(i%3)*2)+v.x*Math.cos(a)*5,z=t.z+u.z*(5+(i%3)*2)+v.z*Math.cos(a)*5;
+    add(foundry,stoneGeo,i%3===0?0xd8a16d:0xb16d47,x,t.h+.18,z,.43,.38,.43);
+    if(i%3===0)redrockPlant(foundry,x+Math.sin(a)*.8,t.h+.10,z-Math.cos(a)*.8,i+31,false);
+   }
+   instanceKit(foundry);yield foundry;
+  }
+  if(r.id==='redrock'&&(t.seed===10||t.seed===14)){
+   const perch=new THREE.Group(),a=t.seed*2.41,raise=Math.min(8,t.h*.24)+2;
+   const cx=t.x+Math.cos(a)*t.rx*.20,cz=t.z+Math.sin(a)*t.rz*.20;
+   for(let i=0;i<2;i++){
+    const x=cx+(i?3.3:-3.3),z=cz+(i?1.1:-1.1),h=new THREE.Group();
+    house(h,r,0,t.h+raise+.10,0,t.seed*2+i,true);h.position.set(x,0,z);h.rotation.y=-r.angle+Math.PI/2+(i?-.35:.22);h.scale.setScalar(.88);perch.add(h);
+    add(perch,cragGeo,i?0xb06b49:0xd0925e,x,t.h+raise-.52,z,2.1,.65,1.75);
+   }
+   for(let i=0;i<7;i++){
+    const x=cx-5+i*1.65;
+    box(perch,0x714a38,x,t.h+raise+.58,cz+3.15,.13,1.08,.13);
+    box(perch,0xb8895b,x,t.h+raise+.08,cz+3.15,1.35,.13,.15);
+   }
+   instanceKit(perch);yield perch;
+  }
   if(r.id==='harbor'&&t.h>10){
    const ledges=new THREE.Group();
    for(let i=0;i<17;i++){
@@ -580,14 +847,36 @@ export function* detailsForRegion(r){
  }
  // Two tiny inhabited shore hamlets accompany each region's central repair village.
  for(const side of [-1,1])for(let j=0;j<4;j++){
-  if(r.id==='harbor')continue; // Both inlet hamlets become open-water skybridge houses.
+  if(r.id==='harbor'||r.id==='redrock')continue; // Red-rock houses perch on real upper shelves.
   const g=new THREE.Group(),a=r.angle+side*.29,p={x:Math.cos(a)*(162+j*.8),z:Math.sin(a)*(162+j*.8)};
   house(g,r,0,3.5+j*.35,0,100+(side+1)*4+j,true);g.position.set(p.x+Math.sin(a)*j*4,0,p.z-Math.cos(a)*j*4);g.rotation.y=-a+Math.PI/2+Math.sin(j*3.1+side)*.16;instanceKit(g);yield g;
  }
 }
 export function createArches(scene){
-
  for(const [x,z,width,y,rot] of [[0,0,22,18,0],[-151,-65,22,19,Math.PI/2],[83,123,20,17,Math.PI/2]]){
+  if(x<0){
+   const gate=new THREE.Group();gate.name='赤岩群柱 · 天然海蝕拱';gate.position.set(x,0,z);gate.rotation.y=rot;
+   // A fractured crown grows out of two eroded cliff feet. Unlike a torus,
+   // there is a navigable open aperture and a layered, asymmetrical top.
+   for(const side of [-1,1]){
+    for(let k=0;k<5;k++){
+     const px=side*(11.3-k*.28),height=2.1+k*4.0;
+     const pillar=add(gate,cragGeo,[0x8f4938,0xab5d42,0xc1784d,0xa75d42,0xd39061][k],px,height,side*(k%2)*.22,3.5-k*.22,2.65,3.1-k*.15);
+     pillar.rotation.y=k*.35+side*.12;
+     if(k===2||k===4)add(gate,cragGeo,0xd69a68,px-side*.6,height+2.3,side*.4,3.45,.35,2.72);
+    }
+    const haunch=add(gate,cragGeo,0xb56d47,side*6.5,19.4,0,2.7,5.0,2.8);haunch.rotation.z=side*.58;
+   }
+   for(let i=0;i<5;i++){
+    const crown=add(gate,cragGeo,i%2?0xc17a4d:0xdfa06d,(i-2)*3.25,24.4+(i%2)*.22,0,2.65,1.37,3.06+(i%3)*.22);
+    crown.rotation.z=(i-2)*.065;crown.rotation.y=i*.31;
+   }
+   for(let i=0;i<4;i++){
+    const x=(i-1.5)*5.2;
+    add(gate,leafGeo,i%2?0x648658:0x9c9b65,x,26.26,1.45,.84,.24,.76);
+   }
+   instanceKit(gate);scene.add(gate);continue;
+  }
   const color=x<0?0xb47756:x>0?0x819493:0xa7ae90;
   for(const side of [-1,1]){const px=x+Math.cos(rot)*side*width/2,pz=z-Math.sin(rot)*side*width/2;for(let k=0;k<5;k++)add(scene,stoneGeo,k%2?color:new THREE.Color(color).multiplyScalar(.9).getHex(),px,y/5*(k+.5),pz,4.5-k*.13,y/5*1.04,4.5-k*.13);}
   const mesh=new THREE.Mesh(new THREE.TorusGeometry(width/2,3.8,6,18,Math.PI),material(color));mesh.position.set(x,y,z);mesh.rotation.y=rot;mesh.castShadow=true;scene.add(mesh);

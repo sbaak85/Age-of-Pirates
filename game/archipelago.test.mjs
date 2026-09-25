@@ -7,6 +7,7 @@ import {TERRAIN} from './archipelago-data.js';
 test('original handcrafted island is restored beside the first port without blocking pickups',()=>{
  const scene=new THREE.Scene(),world=createWorld(scene),island=world.far.getObjectByName('Coralhaven · original handmade island');
  assert.ok(island);assert.ok(Math.hypot(island.position.x-REGIONS[0].dock.x,island.position.z-REGIONS[0].dock.z)<30);
+ assert.ok(world.far.getObjectByName('赤岩鑄砲村 · 層岩港口'),'Red Rock port is missing from the main playable world');
  for(const side of ['西側','東側'])assert.ok(world.far.getObjectByName(`暖沙港 · ${side}空中橋屋`),`${side} bridge is missing from the playable world`);
  assert.equal(navigable(CORALHAVEN.x,CORALHAVEN.z),false);
  for(const item of [...ENCOUNTERS,...LOOT]){const x=item.start?.[0]??item.x,z=item.start?.[1]??item.z;assert.ok(navigable(x,z,2),item.id);}
@@ -17,6 +18,18 @@ test('each port has ten distinct building silhouettes and a stable staggered lay
 });
 test('central canyon cliffs keep their intended long axis',()=>{
  for(const t of TERRAIN.filter(t=>t.seed>=51)){const g=createTerrainBase(t),bounds=new THREE.Box3().setFromObject(g),size=bounds.getSize(new THREE.Vector3());assert.ok(size.z>size.x*1.5,`central cliff ${t.seed} turned sideways`);}
+});
+test('every Red Rock island has an intact upper land surface and the forged harbor is in the playable world',()=>{
+ const islands=TERRAIN.filter(t=>t.region==='redrock');assert.equal(islands.length,10);
+ for(const t of islands){
+  const terrain=createTerrainBase(t);terrain.updateMatrixWorld(true);
+  const cap=terrain.children.find(o=>o.isMesh&&o.geometry.type==='ShapeGeometry'&&Math.abs(o.position.y-t.h)<.2);
+  assert.ok(cap,`red rock island ${t.seed} has no top`);
+  const ray=new THREE.Raycaster(new THREE.Vector3(t.x,t.h+2,t.z),new THREE.Vector3(0,-1,0),0,5);
+  assert.equal(ray.intersectObject(cap).length,1,`red rock island ${t.seed} has a missing top face`);
+ }
+ const village=createVillageBase(REGIONS.find(r=>r.id==='redrock'));
+ assert.ok(village.getObjectByName('赤岩鑄砲村 · 層岩港口'));
 });
 test('both Warm Sand channels stay navigable below skyhouses and upper cliff walls face outward',()=>{
  const village=createVillageBase(REGIONS[0]);
