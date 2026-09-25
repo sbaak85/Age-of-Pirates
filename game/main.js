@@ -1,4 +1,5 @@
-import {REGIONS,TERRAIN,START,ENCOUNTERS,LOOT,WHIRLPOOLS,regionAt,dockAt,whirlpoolForce,upgradeOffer,specialtyOffer} from './archipelago-data.js';
+import { directionalInput } from './directional-controls.js';
+import {REGIONS,TERRAIN,START,ENCOUNTERS,LOOT,WHIRLPOOLS,regionAt,isHarborSafeZone,dockAt,whirlpoolForce,upgradeOffer,specialtyOffer} from './archipelago-data.js';
 import {createTargetStreamer} from './target-stream.js';
 import { createSailController } from './sail-rig.js';
 import * as THREE from 'three';
@@ -21,7 +22,7 @@ document.querySelector('#dock-panel .shop-list').insertAdjacentHTML('beforeend',
 document.querySelector('#pause-panel').insertAdjacentHTML('beforeend','<button id="open-chart">海域航海圖</button>');
 document.querySelector('#screen').insertAdjacentHTML('beforeend','<section id="map-panel" class="panel hidden"><h2>A2 環狀峽灣</h2><canvas id="world-chart" width="460" height="460" aria-label="五區航海圖"></canvas><p class="menu-note">金點：港口　紅點：敵人　青點：魚群　紫圈：漩渦<br>選擇村莊設定航標，依小地圖指引航行。</p><div id="chart-ports"></div><button id="chart-back">返回航行</button></section>');
 for(const r of REGIONS)document.querySelector('#chart-ports').insertAdjacentHTML('beforeend',`<button data-port="${r.id}">${r.village} · 區域等級 ${r.tier}</button>`);
-document.querySelector('#start-panel .features').innerHTML='<span>五區無縫峽灣</span><span>30 組巡弋目標</span><span>五座村莊與特色武裝</span>';
+document.querySelector('#start-panel .features').innerHTML=`<span>暖沙港灣安全區</span><span>${ENCOUNTERS.length} 組外海目標</span><span>五座村莊與特色武裝</span>`;
 document.querySelector('#start-panel .lead').textContent='穿越 A2 環狀峽灣，探訪五座村莊、打撈零件並改裝側舷武裝。';
 document.querySelector('.mission-kicker').textContent='A2 環狀峽灣 / 五港遠航';
 document.querySelector('#controls-hint').textContent='W/S 航行 · A/D 轉向 · 空白 開砲 · F 帆 · M 航海圖 · Enter 港口 | 手把 A 開砲 · Y 帆 · X 港口 · View 航海圖';
@@ -29,14 +30,17 @@ const domCache=new Map();
 const $=selector=>{if(!domCache.has(selector))domCache.set(selector,document.querySelector(selector));return domCache.get(selector);};
 const settingsKey='age-of-pirates-settings-v1',progressKey='age-of-pirates-progress-v1';
 function readStore(key,fallback){try{return {...fallback,...JSON.parse(localStorage.getItem(key)||'{}')};}catch{return {...fallback};}}
-const settings=readStore(settingsKey,{volume:.65,shake:true,rumble:true,guide:true,quality:'balanced',stats:false});
+const settings=readStore(settingsKey,{volume:.65,shake:true,rumble:true,guide:true,quality:'balanced',stats:false,fov:54,cameraX:23,cameraHeight:27.2,cameraZ:27,controlMode:'A'});
+const cameraFields=[['camera-fov','fov',54,20,100],['camera-x','cameraX',23,-100,100],['camera-height','cameraHeight',27.2,5,100],['camera-z','cameraZ',27,-100,100]];
+for(const [,key,fallback,min,max] of cameraFields)settings[key]=typeof settings[key]==='number'&&Number.isFinite(settings[key])?clamp(settings[key],min,max):fallback;
+settings.controlMode=settings.controlMode==='B'?'B':'A';
 const loadout=normalizeLoadout(readStore('age-of-pirates-loadout-v1',{}));
 const save=readStore(progressKey,{gold:0,hull:0,speed:0,cannon:0,parts:0,armory:{}});
 for(const k of ['gold','hull','speed','cannon','parts'])save[k]=Math.max(0,Number(save[k])||0);
 save.armory=save.armory&&typeof save.armory==='object'?save.armory:{};
 let activePort=REGIONS[0],visited=new Set(),waypoint=null;const collectedLoot=new Set();
 const scene=new THREE.Scene();
-const camera=new THREE.PerspectiveCamera(54,innerWidth/innerHeight,.1,240);
+const camera=new THREE.PerspectiveCamera(settings.fov,innerWidth/innerHeight,.1,240);
 const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'});
 renderer.setPixelRatio(Math.min(devicePixelRatio,1.5));renderer.setSize(innerWidth,innerHeight);renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.20;
 renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.domElement.tabIndex=0;renderer.domElement.setAttribute('aria-label','海戰紀元遊戲畫面');$('#scene').appendChild(renderer.domElement);
@@ -98,7 +102,7 @@ function resetVoyage(){
 function start(){sound.unlock();sound.ui();resetVoyage();}
 function pause(){if(phase!=='playing')return;openPanel('pause');sound.ui();}
 function resume(){if(phase==='pause'||phase==='settings'||phase==='dock'||phase==='map'){sound.ui();closePanel();}}
-function openSettings(){settingsFrom=phase;openPanel('settings');$('#volume').value=Math.round(settings.volume*100);$('#volume-output').textContent=`${Math.round(settings.volume*100)}%`;$('#shake').checked=settings.shake;$('#rumble').checked=settings.rumble;$('#guide').checked=settings.guide;}
+function openSettings(){settingsFrom=phase;openPanel('settings');for(const [id,key] of cameraFields)$('#'+id).value=settings[key];updateControlMode();$('#volume').value=Math.round(settings.volume*100);$('#volume-output').textContent=`${Math.round(settings.volume*100)}%`;$('#shake').checked=settings.shake;$('#rumble').checked=settings.rumble;$('#guide').checked=settings.guide;}
 function closeSettings(){openPanel(settingsFrom);}
 function inDock(){return !!dockAt(boat.x,boat.z);}
 function interact(){if(phase!=='playing')return;const port=dockAt(boat.x,boat.z);if(!port)return;activePort=port;visited.add(port.id);updateDock();openPanel('dock');sound.ui();}
@@ -158,7 +162,7 @@ function enemyShoot(target){
 }
 
 function damagePlayer(amount,x,z,y=.7,kind='cannon'){
-  if(boat.invulnerable>0||phase!=='playing')return;
+  if(boat.invulnerable>0||phase!=='playing'||isHarborSafeZone(boat.x,boat.z))return;
   boat.hp=Math.max(0,boat.hp-Math.max(1,amount-PLAYER.armor));
   boat.invulnerable=.34;hitFlash=.55;shakeAmount=.45;
   if(kind==='cannon')effects.explosion(x,y,z,'impact');sound.damage();rumble(220,.65);
@@ -188,6 +192,7 @@ function removeProjectile(index){
 function updateProjectiles(dt){
   for(let i=projectiles.length-1;i>=0;i--){
     const p=projectiles[i];p.age+=dt;p.previousX=p.x;p.previousZ=p.z;p.x+=p.dx*p.speed*dt;p.z+=p.dz*p.speed*dt;
+    if(p.owner!=='player'&&isHarborSafeZone(p.x,p.z)){removeProjectile(i);continue;}
     const flight=p.age/p.life;p.mesh.position.set(p.x,p.startY+Math.sin(Math.min(1,flight)*Math.PI)*1.0-flight*.45,p.z);
     const array=p.trail.geometry.attributes.position.array;
     array[0]=p.previousX;array[1]=p.mesh.position.y+.05;array[2]=p.previousZ;array[3]=p.x;array[4]=p.mesh.position.y;array[5]=p.z;
@@ -206,12 +211,14 @@ function updateProjectiles(dt){
 }
 function updateTargets(dt){
   krakenWarning.visible=false;
+  const safe=isHarborSafeZone(boat.x,boat.z);
   for(const t of targets){
     if(!t.model.loaded)continue;
     if(!t.alive){const progress=clamp((gameTime-t.sinkAt)/1.1,0,1);t.model.group.position.y=t.sinkY-progress*progress*2.4;t.model.group.rotation.z=progress*.32;t.model.group.scale.copy(t.baseScale).multiplyScalar(1-progress*.45);t.model.group.visible=progress<1;continue;}
     if(t.type==='structure')continue;
     const dx=boat.x-t.x,dz=boat.z-t.z,dist=Math.hypot(dx,dz);
-    const melee=t.type==='octopus'?stepKrakenCombat(t,boat,gameTime):null;
+    const previousX=t.x,previousZ=t.z;
+    const melee=t.type==='octopus'?stepKrakenCombat(t,boat,gameTime,safe):null;
     if(melee?.started){notify('克拉肯抬起觸手！駛離紅色揮擊區域',1.6);sound.burst(.38,.08,90,450);}
     if(melee?.strike&&!inDock()){
       const fx=melee.hit?boat.x:t.x+Math.cos(t.melee.heading)*8,fz=melee.hit?boat.z:t.z-Math.sin(t.melee.heading)*8;
@@ -220,7 +227,7 @@ function updateTargets(dt){
     }
     let desired;
     if(melee&&(melee.engaged||melee.locked))desired=melee.heading;
-    else if(t.type!=='octopus'&&t.hostile&&dist<29){const radial=clamp((dist-12)/7,-1,1);desired=Math.atan2(-(dz*radial+dx*.8),dx*radial-dz*.8);}
+    else if(t.type!=='octopus'&&t.hostile&&!safe&&dist<29){const radial=clamp((dist-12)/7,-1,1);desired=Math.atan2(-(dz*radial+dx*.8),dx*radial-dz*.8);}
     else if(t.fleeing&&dist<24)desired=Math.atan2(dz,-dx);
     else{
       t.patrol+=dt*(.12+(t.type==='school'?.11:0));
@@ -230,17 +237,18 @@ function updateTargets(dt){
     const turn=melee?.locked?0:clamp(angleDelta(desired,t.yaw),-dt*(t.fleeing?1.9:1.1),dt*(t.fleeing?1.9:1.1));t.yaw+=turn;
     const speed=melee&&(melee.engaged||melee.locked)?melee.speed:t.speed*(t.hostile&&dist<7?.48:1),step=speed*dt;
     const nx=t.x+Math.cos(t.yaw)*step,nz=t.z-Math.sin(t.yaw)*step;
-    let blocked=Math.hypot(nx,nz)>WORLD_RADIUS-5;
+    let blocked=Math.hypot(nx,nz)>WORLD_RADIUS-5||isHarborSafeZone(nx,nz,t.radius);
     for(const o of world.obstacles){const rx=o.rx+t.radius*.55,rz=o.rz+t.radius*.55;if(((nx-o.x)/rx)**2+((nz-o.z)/rz)**2<1){blocked=true;break;}}
     if(blocked&&!melee?.locked)t.yaw+=Math.PI*.65*dt;else if(!blocked){t.x=nx;t.z=nz;}
     const separation=t.radius+PLAYER.radius+.5,overlap=Math.hypot(t.x-boat.x,t.z-boat.z);
     if(overlap<separation){const outward=overlap>.001?{x:(t.x-boat.x)/overlap,z:(t.z-boat.z)/overlap}:right(boat.yaw);t.x=boat.x+outward.x*separation;t.z=boat.z+outward.z*separation;}
+    if(isHarborSafeZone(t.x,t.z,t.radius)){t.x=previousX;t.z=previousZ;}
     t.model.group.position.y=0;
     t.model.animate(visualTime+t.patrol*.3,melee?.age);
     const bob=t.model.group.position.y;
     t.model.group.position.set(t.x,(t.type==='submarine'?-.42:t.type==='shark'?-.35:.18)+bob,t.z);
     t.model.group.rotation.y=t.yaw;
-    if(t.type!=='octopus'&&t.hostile&&!inDock()&&dist<22&&gameTime>=t.attackAt&&phase==='playing'){
+    if(t.type!=='octopus'&&t.hostile&&!safe&&!inDock()&&dist<22&&gameTime>=t.attackAt&&phase==='playing'){
       enemyShoot(t);t.attackAt=gameTime+ENEMY_CANNON.reload+Math.random()*.9;
     }
     t.damageFlash=Math.max(0,t.damageFlash-dt);
@@ -297,7 +305,7 @@ function updateUi(near){
   $('#hp-text').textContent=`${Math.ceil(boat.hp)} / ${boat.maxHp}`;$('#hp-fill').style.width=`${boat.hp/boat.maxHp*100}%`;
   $('#sail-status').textContent=boat.sailDeployment>0&&boat.sailDeployment<1?(boat.sails?'⛵ 展帆中':'⚓ 收帆中'):(boat.sails?'⛵ 張帆 · 高速':'⚓ 收帆 · 靈巧');$('#speed-status').textContent=`${Math.abs(boat.speed).toFixed(1)} 節`;
   $('#gold-status').textContent=`☼ ${save.gold}`;$('#progress').textContent=`${kills} / ${ENCOUNTERS.length} 目標 · ${visited.size} / 5 村莊 · ${save.parts} 零件`;
-  $('#objective').textContent=regionAt(boat.x,boat.z).name+(waypoint?' → '+waypoint.village:' · 探索五港');
+  $('#objective').textContent=regionAt(boat.x,boat.z).name+(isHarborSafeZone(boat.x,boat.z)?' · 安全海域':waypoint?' → '+waypoint.village:' · 探索五港');
   const port=dockAt(boat.x,boat.z);$('#dock-prompt').textContent=port?port.village+' · X / Enter 整備':'港口整備';
   $('#nearest').textContent=near.target?`最近目標：${near.target.name} · ${Math.round(near.distance)} m`:'尋找海域目標';
   $('#side-name').textContent=side===1?'右舷':'左舷';$('#side-symbol').textContent=side===1?'▶':'◀';$('#side-mode').textContent=manualSide?'手動選側':'自動選側';
@@ -314,9 +322,12 @@ function updateUi(near){
   if(insideVortex){$('#nearest').textContent='漩渦吸引中！張帆並朝外持續加速';}
   $('#boundary-warning').classList.toggle('hidden',phase!=='playing'||Math.hypot(boat.x,boat.z)<188);
 }
+const occlusionProbe=new THREE.PerspectiveCamera();
 function updateCamera(dt){
   const f=forward(boat.yaw),look=new THREE.Vector3(boat.x+f.x*3,0,boat.z+f.z*3);
-  const desired=new THREE.Vector3(boat.x+23,34,boat.z+27);
+  occlusionProbe.position.set(boat.x+settings.cameraX,settings.cameraHeight,boat.z+settings.cameraZ);
+  world.occlusion.update(occlusionProbe,renderer,playerModel.position,dt);
+  const desired=new THREE.Vector3(boat.x+settings.cameraX,settings.cameraHeight*world.occlusion.heightMultiplier,boat.z+settings.cameraZ);
   const factor=1-Math.exp(-2.1*dt);camera.position.lerp(desired,factor);
   if(settings.shake&&shakeAmount>.001){camera.position.x+=(Math.random()-.5)*shakeAmount;camera.position.y+=(Math.random()-.5)*shakeAmount*.7;}
   camera.lookAt(look);shakeAmount*=Math.exp(-8*dt);
@@ -329,7 +340,18 @@ function updatePlayerVisual(){
   playerModel.rotation.x=clamp(pose.pitch,-.10,.10)+Math.sin(visualTime*1.8)*.008;
   playerModel.rotation.z=clamp(pose.roll,-.12,.12);
 }
+const cameraDirection=new THREE.Vector3();
+function updateControlMode(){
+ $('#control-mode').textContent=`操作模式：${settings.controlMode==='B'?'B · 方向航行':'A · 油門／船舵'}　› 點擊切換`;
+ $('#control-mode-help').textContent=settings.controlMode==='B'?'左搖桿指定畫面方向，輕推慢航、全推全速；放開後慣性滑行。鍵盤仍使用 W/S 油門、A/D 船舵。':'左搖桿上下控制油門與倒船，左右控制船舵。';
+ $('#controls-hint').textContent=`W/S 航行 · A/D 轉舵 · 空白 開砲 · F 帆 · M 海圖 | 手把 ${settings.controlMode==='B'?'左搖桿指定航向':'左搖桿油門／船舵'} · A 開砲 · Y 帆 · X 港口`;
+}
 function inputVector(pad){
+  const keyboard=keys.has('KeyW')||keys.has('KeyS')||keys.has('KeyA')||keys.has('KeyD');
+  if(pad&&settings.controlMode==='B'&&!keyboard){
+    camera.getWorldDirection(cameraDirection);
+    return directionalInput(pad.axes[0]||0,pad.axes[1]||0,cameraDirection);
+  }
   const dead=v=>Math.abs(v)<.13?0:Math.sign(v)*(Math.abs(v)-.13)/.87;
   if(pad){return {steer:clamp(dead(pad.axes[0]||0)+(keys.has('KeyD')?1:0)-(keys.has('KeyA')?1:0),-1,1),throttle:clamp(-dead(pad.axes[1]||0)+(keys.has('KeyW')?1:0)-(keys.has('KeyS')?1:0),-1,1)};}
   return {steer:(keys.has('KeyD')?1:0)-(keys.has('KeyA')?1:0),throttle:(keys.has('KeyW')?1:0)-(keys.has('KeyS')?1:0)};
@@ -396,8 +418,8 @@ function gamepadUpdate(){
     if(!up&&!down)nextGamepadNav=0;
     if(edge(0))activateMenuItem(menuItems()[menuIndex]);
     if(edge(1)||edge(9)){if(phase==='pause')resume();else if(phase==='settings')closeSettings();else if(phase==='dock'||phase==='map')closePanel();else if(phase==='loadout')openPanel('title');}
-    const selected=menuItems()[menuIndex];if(selected?.querySelector('input[type=range]')){
-      const axis=pad.axes[0]||0;if(Math.abs(axis)>.45&&visualTime>lastGamepadNav){const input=selected.querySelector('input');input.value=clamp(Number(input.value)+Math.sign(axis)*5,0,100);input.dispatchEvent(new Event('input'));input.blur();selected.classList.remove('is-selected');lastGamepadNav=visualTime+.12;}
+    const selected=menuItems()[menuIndex];if(selected?.querySelector('input[type=range],input[type=number]')){
+      const axis=pad.axes[0]||0;if(Math.abs(axis)>.45&&visualTime>lastGamepadNav){const input=selected.querySelector('input');input.value=clamp(Number(input.value)+Math.sign(axis)*(input.type==='number'?1:5),Number(input.min),Number(input.max));input.dispatchEvent(new Event('input'));input.blur();selected.classList.remove('is-selected');lastGamepadNav=visualTime+.12;}
     }
   }
   previousButtons=Object.fromEntries(pad.buttons.map((_,i)=>[i,pressed(i)]));return pad;
@@ -415,7 +437,7 @@ function frame(now){
     const near=updateGuide();uiTimer-=dt;if(uiTimer<=0){updateUi(near);uiTimer=.08;}
   }else{guide.visible=false;marker.visible=false;}
   world.update(visualTime,dt,boat);updatePlayerVisual();updateCamera(dt);effects.update(phase==='playing'?dt:0,camera);
-  world.occlusion.update(camera,renderer,playerModel.position,dt);
+
   for(const cannon of shipParts.cannons){cannon.userData.recoil=Math.max(0,(cannon.userData.recoil||0)-dt*4);cannon.position.z=-cannon.userData.side*Math.sin(cannon.userData.recoil*Math.PI*.5)*.13;}
   shadowTimer-=dt;if(shadowTimer<=0){renderer.shadowMap.needsUpdate=true;shadowTimer=settings.quality==='high'?.033:.10;}
   renderer.render(scene,camera);requestAnimationFrame(frame);
@@ -444,9 +466,25 @@ $('#result-restart').addEventListener('click',start);
 $('#dock-prompt').addEventListener('click',interact);
 for(const button of document.querySelectorAll('[data-buy]'))button.addEventListener('click',()=>buy(button.dataset.buy));
 $('#volume').addEventListener('input',event=>{settings.volume=Number(event.target.value)/100;$('#volume-output').textContent=`${event.target.value}%`;sound.setVolume(settings.volume);persistSettings();});
+const cameraInputs=new Set();
+for(const [id,key,,min,max] of cameraFields){
+ const input=$('#'+id);cameraInputs.add(input);
+ const apply=()=>{
+  const value=input.valueAsNumber;
+  if(!Number.isFinite(value)||value<min||value>max)return;
+  settings[key]=value;
+  if(key==='fov'){camera.fov=value;camera.updateProjectionMatrix();}
+  persistSettings();
+ };
+ input.addEventListener('input',apply);
+ input.addEventListener('change',()=>{const value=input.valueAsNumber;input.value=Number.isFinite(value)?clamp(value,min,max):settings[key];apply();});
+}
+$('#control-mode').addEventListener('click',()=>{settings.controlMode=settings.controlMode==='A'?'B':'A';boat.steering=0;updateControlMode();persistSettings();});
+updateControlMode();
 for(const id of ['shake','rumble','guide'])$(`#${id}`).addEventListener('change',event=>{settings[id]=event.target.checked;persistSettings();});
 window.addEventListener('keydown',event=>{
   if(window.pirateStartup?.active)return;
+  if(cameraInputs.has(event.target)&&event.code!=='Escape'){if(event.code==='Enter'){event.preventDefault();event.target.blur();}return;}
   if(['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(event.code)||(phase==='playing'&&event.code==='Enter'))event.preventDefault();
   if(phase==='playing'){
     if(event.code==='KeyM'&&!event.repeat)openChart();else if(event.code==='Escape')pause();else if(event.code==='KeyF'&&!event.repeat)toggleSails();
@@ -477,4 +515,4 @@ for(const target of targets){
 applyQuality();updateLoadout();
 window.pirateStartup?.report(55,'Preparing the sea and ship');
 renderer.domElement.addEventListener('webglcontextlost',event=>{event.preventDefault();window.pirateStartup?.fail();});
-openPanel('title');playerModel.position.set(boat.x,.38,boat.z);camera.position.set(boat.x+16,24,boat.z+19);requestAnimationFrame(frame);
+openPanel('title');playerModel.position.set(boat.x,.38,boat.z);camera.position.set(boat.x+settings.cameraX,settings.cameraHeight,boat.z+settings.cameraZ);requestAnimationFrame(frame);

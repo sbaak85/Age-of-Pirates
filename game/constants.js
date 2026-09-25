@@ -1,5 +1,5 @@
 export const WORLD_RADIUS = 210;
-export const PLAYER = Object.freeze({ maxHp: 160, armor: 2, acceleration: 1.32, steeringResponse: 3.4, hullResponse: 1.65, maxSpeed: 7.2, sailSpeed: 9.2, reverseSpeed: 2.8, turnRate: 1.16, radius: 1.7 });
+export const PLAYER = Object.freeze({ maxHp: 160, armor: 2, acceleration: 1.32, steeringResponse: 3.4, hullResponse: 1.65, maxSpeed: 7.2, sailSpeed: 9.2, reverseSpeed: 2.8, turnRate: 1.16, minTurnRadius: 8, radius: 1.7 });
 export const CANNON = Object.freeze({ volleyCount: 4, volleyInterval: .3, reload: 3.2, speed: 21, life: 1.65, damage: 22, radius: .28 });
 export const ENEMY_CANNON = Object.freeze({ damage: 12, speed: 15, life: 2, reload: 4.6 });
 export const TARGET_DEFS = Object.freeze([

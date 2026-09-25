@@ -9,12 +9,19 @@ test('scenery patches are shared, isolated from ships, and reusable by streamed 
  const first=a.material;cut.attach(g);assert.equal(a.material,first);
  const next=new THREE.Mesh(a.geometry,original);cut.attach(next);assert.equal(next.material,first);cut.dispose();
 });
-test('cutaway tracks projected ship position across pixel ratios and fades when disabled',()=>{
- const cut=createCameraOcclusion(),camera=new THREE.PerspectiveCamera(54,16/9,.1,240);camera.position.set(23,34,-38);camera.lookAt(0,0,-65);
- const target=new THREE.Vector3(0,.4,-65),renderer={getDrawingBufferSize:v=>v.set(1280,720)};
- for(let i=0;i<60;i++)cut.update(camera,renderer,target,1/60);
- assert.ok(cut.uniforms.cutStrength.value>.99);const centre=cut.uniforms.cutCenter.value.clone(),radius=cut.uniforms.cutRadius.value.clone();
- assert.ok(centre.x>0&&centre.x<1280&&centre.y>0&&centre.y<720);assert.ok(radius.x>0&&radius.y>radius.x);
- renderer.getDrawingBufferSize=v=>v.set(2560,1440);cut.update(camera,renderer,target,1/60);assert.ok(cut.uniforms.cutCenter.value.distanceTo(centre.multiplyScalar(2))<1e-6);assert.ok(cut.uniforms.cutRadius.value.distanceTo(radius.multiplyScalar(2))<1e-6);
- for(let i=0;i<60;i++)cut.update(camera,renderer,target,1/60,false);assert.ok(cut.uniforms.cutStrength.value<.001);
+
+test('upper cliff fade lifts by 15 percent without accumulation and restores outside occlusion',()=>{
+ const cut=createCameraOcclusion(),camera=new THREE.PerspectiveCamera();camera.position.set(0,27.2,27);
+ const rock=new THREE.Mesh(new THREE.BoxGeometry(20,40,10),new THREE.MeshStandardMaterial());rock.position.set(0,20,14);cut.register(rock);
+ const distant=rock.clone();distant.position.x=100;cut.register(distant);
+ const target=new THREE.Vector3();
+ for(let i=0;i<180;i++)cut.update(camera,null,target,1/60);
+ assert.ok(Math.abs(cut.heightMultiplier-1.15)<.0001);
+ assert.ok(Math.abs(27.2*cut.heightMultiplier-31.28)<.001);
+ assert.equal(cut.uniforms.fadeAmount.value.filter(x=>x>0).length,1);
+ for(let i=0;i<180;i++)cut.update(camera,null,target,1/60);
+ assert.ok(cut.heightMultiplier<=1.15);
+ camera.position.x=100;target.x=100;target.z=100;
+ for(let i=0;i<240;i++)cut.update(camera,null,target,1/60);
+ assert.equal(cut.heightMultiplier,1);assert.ok(cut.uniforms.fadeAmount.value.every(x=>x===0));
 });

@@ -12,19 +12,30 @@ export function nearestSide(boat,targets){
   for(const t of targets){if(!t.alive||t.kind==='chest')continue;const d=distance(boat,t);if(d<best){best=d;nearest=t;}}
   return nearest?{side:sideOf(boat,nearest),target:nearest,distance:best}:{side:1,target:null,distance:Infinity};
 }
-export function createBoatState(x=-3,z=14,yaw=-Math.PI/2){return {x,z,yaw,vx:0,vz:0,speed:0,steering:0,hp:PLAYER.maxHp,maxHp:PLAYER.maxHp,sails:true,sailDeployment:1,invulnerable:0,speedBonus:0,damageBonus:0};}
+export function createBoatState(x=-3,z=14,yaw=-Math.PI/2){return {x,z,yaw,vx:0,vz:0,speed:0,steering:0,hp:PLAYER.maxHp,maxHp:PLAYER.maxHp,sails:true,sailDeployment:1,invulnerable:0,speedBonus:0,damageBonus:0,minTurnRadius:PLAYER.minTurnRadius,steeringResponse:PLAYER.steeringResponse,acceleration:PLAYER.acceleration};}
 export function stepBoat(boat,input,dt,obstacles=[]){
-  const steer=clamp(input.steer||0,-1,1),throttle=clamp(input.throttle||0,-1,1);
+  const directional=!!input.directional;
+  let headingError=Number.isFinite(input.targetYaw)?Math.atan2(Math.sin(input.targetYaw-boat.yaw),Math.cos(input.targetYaw-boat.yaw)):null;
+  // Keep the chosen turn side stable near a 180-degree command.
+  if(headingError!==null&&Math.abs(headingError)>Math.PI-.08&&Math.abs(boat.steering)>.1)headingError=-Math.sign(boat.steering)*Math.abs(headingError);
+  const steer=directional&&headingError!==null?clamp(-headingError*1.8,-1,1):clamp(input.steer||0,-1,1),throttle=clamp(input.throttle||0,directional?0:-1,1);
   boat.sailDeployment=advanceSails(boat.sailDeployment??(boat.sails?1:0),boat.sails,dt);
   const deployed=sailEase(boat.sailDeployment),furled=1-deployed;
-  boat.steering=damp(boat.steering,steer,PLAYER.steeringResponse*(1+.3*furled),dt);
+  boat.steering=damp(boat.steering,steer,(boat.steeringResponse??PLAYER.steeringResponse)*(1+.3*furled),dt);
   const max=(PLAYER.maxSpeed+(PLAYER.sailSpeed-PLAYER.maxSpeed)*deployed)*(1+(boat.speedBonus||0));
   const desired=throttle>=0?throttle*max:throttle*PLAYER.reverseSpeed;
-  boat.speed=damp(boat.speed,desired,throttle===0?.8+.35*furled:PLAYER.acceleration*(1+.2*furled),dt);
+  boat.speed=damp(boat.speed,desired,throttle===0?.8+.35*furled:(boat.acceleration??PLAYER.acceleration)*(1+.2*furled),dt);
   if(Math.abs(boat.speed)<.025)boat.speed=0;
   const travel=clamp(Math.abs(boat.speed)/max,0,1);
   const direction=Math.sign(boat.speed)||1;
-  boat.yaw-=boat.steering*direction*PLAYER.turnRate*(1+.28*furled)*(.15+.07*furled+(.85-.07*furled)*travel)*dt;
+  let yawRate=-boat.steering*direction*PLAYER.turnRate*(1+.28*furled)*(.15+.07*furled+(.85-.07*furled)*travel);
+  if(directional){
+    // Angular speed <= actual travel speed / radius. No stationary pivot.
+    const limit=Math.hypot(boat.vx,boat.vz)/Math.max(.1,boat.minTurnRadius??PLAYER.minTurnRadius);
+    yawRate=clamp(yawRate,-limit,limit);
+    if(headingError!==null&&yawRate*headingError>0&&Math.abs(yawRate*dt)>Math.abs(headingError))yawRate=headingError/dt;
+  }
+  boat.yaw+=yawRate*dt;
   const f=forward(boat.yaw);
   const chop=1-.015*Math.sin(boat.x*.38+boat.z*.27);
   boat.vx=damp(boat.vx,f.x*boat.speed*chop,PLAYER.hullResponse*(1+.3*furled),dt);

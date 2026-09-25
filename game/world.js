@@ -9,17 +9,25 @@ export function createWorld(scene){
  scene.background=new THREE.Color(0xa8c6cc);scene.fog=new THREE.Fog(0xa8c6cc,62,155);
  scene.add(new THREE.HemisphereLight(0xe0fff2,0x8c7259,1.35));
  const sun=new THREE.DirectionalLight(0xffe7bf,3.1);sun.position.set(-18,60,22);sun.castShadow=true;sun.shadow.mapSize.set(1024,1024);Object.assign(sun.shadow.camera,{left:-50,right:50,top:50,bottom:-50,near:1,far:150});sun.shadow.normalBias=.09;scene.add(sun,sun.target);
+ const occlusion=createCameraOcclusion();
  const far=new THREE.Group();far.name='Permanent low-detail archipelago';scene.add(far);
- for(const r of REGIONS){const group=new THREE.Group();for(const t of TERRAIN.filter(t=>t.region===r.id))group.add(createTerrainBase(t));if(r.id==='reef')group.add(createReefClusterBeds());consolidateChunk(group);far.add(group);}
+ for(const r of REGIONS){
+  const group=new THREE.Group();
+  for(const t of TERRAIN.filter(t=>t.region===r.id)){
+   const terrain=createTerrainBase(t);occlusion.register(terrain);group.add(terrain);
+  }
+  if(r.id==='reef')group.add(createReefClusterBeds());
+  consolidateChunk(group);far.add(group);
+ }
  const coralhaven=createIsland();coralhaven.island.name='Coralhaven · original handmade island';
  coralhaven.island.position.set(CORALHAVEN.x,0,CORALHAVEN.z);coralhaven.island.rotation.y=.65;coralhaven.island.scale.setScalar(1.25);
  // Canonicalize repeated opaque colours before batching the original high-detail meshes.
  const materialKit=new Map();coralhaven.island.traverse(o=>{if(!o.isMesh||o.material.map||o.material.transparent)return;const m=o.material,k=[m.color.getHex(),m.roughness,m.metalness,m.side,m.flatShading,m.vertexColors].join('/');if(materialKit.has(k))o.material=materialKit.get(k);else materialKit.set(k,m);});
  batchStatic(coralhaven.island);far.add(coralhaven.island);
  const chunks=REGIONS.map(r=>{const village=createVillageBase(r);far.add(village);return {region:r,village,detail:null,generator:null,ready:false,lastNear:0};});
- createArches(far);const ocean=createSea();scene.add(ocean.seabed,ocean.mesh);const whirlUpdate=createWhirlpoolVisuals(scene);
+ const arches=new THREE.Group();createArches(arches);for(const arch of arches.children)occlusion.register(arch);far.add(arches);const ocean=createSea();scene.add(ocean.seabed,ocean.mesh);const whirlUpdate=createWhirlpoolVisuals(scene);
  let clock=0,overview=false,totalBuilt=0,totalReleased=0;const batching={before:0,after:0};far.traverse(o=>{if(o.isMesh){batching.before+=o.isInstancedMesh?o.count:1;batching.after++;}});
- const occlusion=createCameraOcclusion();occlusion.attach(far);
+ occlusion.attach(far);
  const world={obstacles:OBSTACLES,outposts:[],sun,ocean,batching,far,occlusion,
   setOverview(value){overview=value;ocean.setOverview(value);scene.fog=value?null:new THREE.Fog(0xa8c6cc,62,155);},
   stats:()=>({loaded:chunks.filter(c=>c.ready).length,building:chunks.filter(c=>c.generator).length,built:totalBuilt,released:totalReleased}),

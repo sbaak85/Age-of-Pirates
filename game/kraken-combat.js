@@ -2,8 +2,9 @@ export const KRAKEN_MELEE=Object.freeze({detect:32,disengage:40,approach:8.5,rea
 const delta=(a,b)=>Math.atan2(Math.sin(a-b),Math.cos(a-b));
 
 // Uses game time so pausing also freezes anticipation, contact and cooldown.
-export function stepKrakenCombat(target,player,now){
+export function stepKrakenCombat(target,player,now,safe=false){
   const s=target.melee??={engaged:false,startedAt:null,nextAttack:0,struck:false,heading:0,age:undefined};
+  if(safe){s.engaged=false;s.startedAt=null;s.struck=false;s.age=undefined;return {engaged:false,locked:false,started:false,strike:false,hit:false,warning:false,age:undefined,speed:0};}
   const dx=player.x-target.x,dz=player.z-target.z,distance=Math.hypot(dx,dz),toward=Math.atan2(-dz,dx);
   let started=false,strike=false,hit=false;
   if(!target.alive)return {engaged:false,locked:false,started,strike,hit,warning:false,age:undefined,speed:0};

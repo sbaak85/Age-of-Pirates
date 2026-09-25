@@ -85,9 +85,14 @@ for(const [x,z,w,rot] of [[0,0,22,0],[-151,-65,22,Math.PI/2],[83,123,20,Math.PI/
 for(const r of REGIONS){const u={x:Math.cos(r.angle),z:Math.sin(r.angle)};OBSTACLES.push({x:u.x*141,z:u.z*141,rx:Math.abs(u.x)*7+Math.abs(u.z)*2,rz:Math.abs(u.z)*7+Math.abs(u.x)*2});}
 export const WHIRLPOOLS=[{id:'whirl-1',...polar(3.0,122),radius:11},{id:'whirl-2',...polar(4.28,105),radius:12},{id:'whirl-3',...polar(.2,112),radius:10}];
 export function regionAt(x,z){return REGIONS.reduce((best,r)=>Math.hypot(x-r.dock.x,z-r.dock.z)<Math.hypot(x-best.dock.x,z-best.dock.z)?r:best,REGIONS[0]);}
+// Same nearest-port boundary used by the region HUD. Padding keeps enemy bodies outside.
+export function isHarborSafeZone(x,z,padding=0){
+ const harbor=REGIONS[0].dock,home=(x-harbor.x)**2+(z-harbor.z)**2;
+ return REGIONS.slice(1).every(r=>home-((x-r.dock.x)**2+(z-r.dock.z)**2)<=2*padding*Math.hypot(r.dock.x-harbor.x,r.dock.z-harbor.z));
+}
 export function dockAt(x,z){return REGIONS.find(r=>Math.hypot(x-r.dock.x,z-r.dock.z)<10)||null;}
 export function navigable(x,z,padding=2){return Math.hypot(x,z)<MAP_RADIUS-padding&&!OBSTACLES.some(o=>Math.hypot((x-o.x)/(o.rx+padding),(z-o.z)/(o.rz+padding))<1);}
-export const ENCOUNTERS=REGIONS.flatMap((r,i)=>['ship','shark','school','ship','submarine','octopus'].map((type,j)=>{
+export const ENCOUNTERS=REGIONS.flatMap((r,i)=>r.id==='harbor'?[]:['ship','shark','school','ship','submarine','octopus'].map((type,j)=>{
  const a=r.angle+(j-2.5)*.15,p=polar(a,j%2?107:115);
  return {id:`${r.id}-${j}`,name:`${r.name} · ${['巡防海盜','尖牙鯊魚','黃金魚群','掠奪艦','銅翼潛艇','赤潮克拉肯'][j]}`,region:r.id,type,hp:Math.round(({ship:100,shark:75,school:60,submarine:115,octopus:180}[type])*(1+(r.tier-1)*.16)),radius:type==='octopus'?4.5:type==='school'?2.7:2.3,speed:type==='school'?4.7:type==='shark'?4:type==='octopus'?1.7:2.7,reward:25+r.tier*12,color:[0xa94635,0x355e72,0x557e80,0x65576e,0x9e6f39][i],hostile:!['shark','school'].includes(type),fleeing:['shark','school'].includes(type),start:[p.x,p.z]};
 }));
