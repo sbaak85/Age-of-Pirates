@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import {createSea} from './sea.js';
 import {TERRAIN,REGIONS,OBSTACLES,CORALHAVEN,regionAt} from './archipelago-data.js';
-import {createTerrainBase,createVillageBase,detailsForRegion,createArches,createWhirlpoolVisuals,releaseChunk,instanceKit,consolidateChunk} from './archipelago-art.js';
+import {createTerrainBase,createReefClusterBeds,createVillageBase,detailsForRegion,createArches,createWhirlpoolVisuals,releaseChunk,instanceKit,consolidateChunk} from './archipelago-art.js';
 import {createIsland} from '../ship-preview/island.js';
 import {batchStatic} from './optimization.js';
 import {createCameraOcclusion} from './camera-occlusion.js';
@@ -10,7 +10,7 @@ export function createWorld(scene){
  scene.add(new THREE.HemisphereLight(0xe0fff2,0x8c7259,1.35));
  const sun=new THREE.DirectionalLight(0xffe7bf,3.1);sun.position.set(-18,60,22);sun.castShadow=true;sun.shadow.mapSize.set(1024,1024);Object.assign(sun.shadow.camera,{left:-50,right:50,top:50,bottom:-50,near:1,far:150});sun.shadow.normalBias=.09;scene.add(sun,sun.target);
  const far=new THREE.Group();far.name='Permanent low-detail archipelago';scene.add(far);
- for(const r of REGIONS){const group=new THREE.Group();for(const t of TERRAIN.filter(t=>t.region===r.id))group.add(createTerrainBase(t));consolidateChunk(group);far.add(group);}
+ for(const r of REGIONS){const group=new THREE.Group();for(const t of TERRAIN.filter(t=>t.region===r.id))group.add(createTerrainBase(t));if(r.id==='reef')group.add(createReefClusterBeds());consolidateChunk(group);far.add(group);}
  const coralhaven=createIsland();coralhaven.island.name='Coralhaven · original handmade island';
  coralhaven.island.position.set(CORALHAVEN.x,0,CORALHAVEN.z);coralhaven.island.rotation.y=.65;coralhaven.island.scale.setScalar(1.25);
  // Canonicalize repeated opaque colours before batching the original high-detail meshes.

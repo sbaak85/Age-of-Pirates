@@ -14,29 +14,50 @@ export const CORALHAVEN={...polar(REGIONS[0].angle-.18,136),radius:15};
 export const TERRAIN=[];
 for(const region of REGIONS){
  for(let j=-2;j<=2;j++){
-  const a=region.angle+j*.16+(j===0?0:Math.sin(j*3.7+region.tier)*.025);
+  const a=region.angle+j*(region.id==='reef'?.32:.16)+(j===0?0:Math.sin(j*3.7+region.tier)*.025)+(region.id==='reef'&&j===1?.045:0);
   const p=polar(a,j===0?169:166+(Math.abs(j)%2)*5+Math.sin(j*2.4+region.tier)*2);
   // Leave a ship-width water channel below each of the two bridge houses.
   if(region.id==='harbor'&&j===-2){p.x+=Math.sin(region.angle)*30;p.z-=Math.cos(region.angle)*30;}
   if(region.id==='harbor'&&j===2){p.x-=Math.sin(region.angle)*30;p.z+=Math.cos(region.angle)*30;}
-  const rx=j===0?33:region.id==='reef'?19+Math.abs(j)*2:region.id==='redrock'?13+Math.abs(j):16+((j+region.tier+5)%3)*2;
-  const rz=j===0?33:region.id==='fjord'?14+Math.abs(j)*2:region.id==='reef'?19:16+((j*2+region.tier+6)%3)*2;
-  const h=j===0?5.2:region.id==='reef'?8+Math.abs(j)*2:region.id==='redrock'?27+Math.abs(j)*5:region.id==='fjord'?32+Math.abs(j)*7:region.tier*5+11+(j+2)%3*3;
+  const rx=j===0?region.id==='reef'?25:33:region.id==='reef'?11+Math.abs(j)*1.5:region.id==='redrock'?13+Math.abs(j):16+((j+region.tier+5)%3)*2;
+  const rz=j===0?region.id==='reef'?22:33:region.id==='fjord'?14+Math.abs(j)*2:region.id==='reef'?9+Math.abs(j):16+((j*2+region.tier+6)%3)*2;
+  const h=j===0?region.id==='reef'?6.2:5.2:region.id==='reef'?2.7+Math.abs(j)*.55:region.id==='redrock'?27+Math.abs(j)*5:region.id==='fjord'?32+Math.abs(j)*7:region.tier*5+11+(j+2)%3*3;
   TERRAIN.push({...p,rx,rz,h,region:region.id,seed:TERRAIN.length});
  }
  // Inside coast of the navigable ring; passage radius 111 remains unobstructed.
  for(let j=-1;j<=1;j++){
   const p=polar(region.angle+j*.22,72);
-  TERRAIN.push({...p,rx:14,rz:16,h:region.id==='reef'?8:18+region.tier*4,region:region.id,seed:TERRAIN.length});
+  TERRAIN.push({...p,rx:region.id==='reef'?9:14,rz:region.id==='reef'?8:16,h:region.id==='reef'?2.8+(j+1)*.35:18+region.tier*4,region:region.id,seed:TERRAIN.length});
  }
  // Two smaller satellites per coast create varied shore silhouettes and narrower, readable waterways.
  const outer=polar(region.angle+.38,183),inner=polar(region.angle-.36,78);
  if(region.id==='harbor'){outer.x-=Math.sin(region.angle)*30;outer.z+=Math.cos(region.angle)*30;}
- TERRAIN.push({...outer,rx:region.id==='reef'?12:8,rz:region.id==='fjord'?13:10,h:region.id==='reef'?5:9+region.tier*2,region:region.id,seed:TERRAIN.length});
- TERRAIN.push({...inner,rx:region.id==='redrock'?8:10,rz:region.id==='mist'?13:9,h:region.id==='reef'?6:12+region.tier*3,region:region.id,seed:TERRAIN.length});
+ TERRAIN.push({...outer,rx:region.id==='reef'?8:8,rz:region.id==='fjord'?13:region.id==='reef'?7:10,h:region.id==='reef'?2.5:9+region.tier*2,region:region.id,seed:TERRAIN.length});
+ TERRAIN.push({...inner,rx:region.id==='redrock'?8:region.id==='reef'?7:10,rz:region.id==='mist'?13:region.id==='reef'?7:9,h:region.id==='reef'?2.7:12+region.tier*3,region:region.id,seed:TERRAIN.length});
 }
 // Two central mountain masses leave an open north/south sea-arch passage.
 TERRAIN.push({x:-30,z:0,rx:20,rz:49,h:39,region:'harbor',seed:51},{x:30,z:0,rx:20,rz:49,h:46,region:'fjord',seed:52});
+// The resort lagoon expands into three irregular shoal belts. Their tiny land
+// cores stay off the 111 U main route; the turquoise underwater flats extend
+// farther than the collision ellipses and remain passable by ship.
+const reef=REGIONS.find(r=>r.id==='reef');
+const reefCandidates=[
+ [-.66,88,6,5],[-.51,84,7,5.5],[-.37,89,6.5,6],[-.11,87,6,5],[.12,88,6.5,5.5],[.39,86,7,6],[.55,89,6,5],
+ [-.64,139,7,6],[-.49,143,6,6],[-.34,138,7,5.5],[-.18,143,6,5.5],[.18,141,7,6],[.33,137,6,5.5],[.48,144,7,6],[.64,139,6,5],
+ [-.65,190,7,6],[-.49,193,6,5.5],[-.36,188,7,5.5],[-.17,193,6,5],[.04,191,7,6],[.18,193,6,5.5],[.38,191,7,6],[.53,187,6,5],[.65,194,6,5],
+];
+let reefShoalSeed=53;
+for(const [offset,radius,rx,rz] of reefCandidates){
+ const p=polar(reef.angle+offset,radius),tooClose=TERRAIN.some(t=>t.region==='reef'&&Math.hypot(p.x-t.x,p.z-t.z)<Math.max(rx,rz)+Math.max(t.rx,t.rz)+5);
+ if(tooClose)continue;
+ TERRAIN.push({...p,rx,rz,h:2.15+(reefShoalSeed%4)*.34,region:'reef',seed:reefShoalSeed++,shoal:true});
+}
+// The two circled resort groups share submerged reef foundations. Their dry
+// island cores remain separate and the smaller inner-lagoon islets stay free.
+export const REEF_CLUSTER_BEDS=Object.freeze([
+ {id:'blue',name:'藍圈',seeds:Object.freeze([30,31,55,56,57,58,63,64])},
+ {id:'red',name:'紅圈',seeds:Object.freeze([33,34,38,59,60,61,62,65,66,67])},
+]);
 // Five authored shelves soften the sea-facing feet marked on the Red Rock
 // preview. Their stone cores have collision; the outer sandy lips sit below
 // wave height and can be sailed across.

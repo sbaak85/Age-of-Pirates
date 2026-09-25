@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import {REGIONS,TERRAIN,WHIRLPOOLS,REDROCK_SHOALS,REDROCK_GRAND_ARCH} from './archipelago-data.js';
+import {REGIONS,TERRAIN,WHIRLPOOLS,REDROCK_SHOALS,REDROCK_GRAND_ARCH,REEF_CLUSTER_BEDS} from './archipelago-data.js';
 const palette=new Map();
 const material=color=>{if(!palette.has(color))palette.set(color,new THREE.MeshStandardMaterial({color,roughness:.87,flatShading:true}));return palette.get(color);};
 const boxGeo=new THREE.BoxGeometry(1,1,1),stoneGeo=new THREE.CylinderGeometry(.80,1,1,9,1),roofGeo=new THREE.BufferGeometry(),leafGeo=new THREE.IcosahedronGeometry(1,0);
@@ -167,7 +167,115 @@ function house(g,r,x,y,z,slot,detail){
  return type;
 }
 function sideOffset(i,w){return (i-1.5)*w*.23;}
+function reefCottage(g,x,y,z,slot,detail){
+ const type=slot%4,raised=type===0?.85:.35,w=type===2?4.45:3.65,d=type===1?4.25:3.25;
+ const wall=[0xf2dfbc,0xe8e5ca,0xe1c7aa,0xf2d7b1][slot%4],roof=[0xd87a61,0x3e9799,0xe2a16a,0x6dafa0][slot%4],timber=0x876c52;
+ box(g,0xc9a37a,x,y+raised*.5,z,w+1,raised+.22,d+1);
+ for(const sx of [-1,1])for(const sz of [-1,1])box(g,timber,x+sx*w*.43,y+raised*.5,z+sz*d*.42,.22,raised+.3,.22);
+ box(g,wall,x,y+raised+1.65,z,w,3.3,d);
+ const roofMesh=add(g,roofGeo,roof,x,y+raised+3.95,z,w*.64,1.35,d*.70);roofMesh.rotation.y=type===3?Math.PI/2:0;
+ box(g,0xf7e5c0,x,y+raised+.35,z+d*.77,w+1.6,.18,2.15);
+ for(const side of [-1,1]){
+  box(g,timber,x+side*(w*.5+.38),y+raised+1.15,z+d*.74,.14,1.65,.14);
+  box(g,0x4e9dad,x+side*w*.25,y+raised+2.15,z+d*.52,.70,.85,.08);
+  box(g,0xf8e4b7,x+side*w*.25,y+raised+2.15,z+d*.59,.49,.57,.05);
+ }
+ box(g,0x765846,x,y+raised+1.18,z+d*.53,.82,1.85,.10);
+ if(!detail)return;
+ for(const side of [-1,1]){
+  for(const depth of [-.25,.28]){
+   const wx=x+side*(w*.5+.07),wz=z+depth*d;
+   box(g,0xf9e8c8,wx,y+raised+2.05,wz,.16,1.25,.96);
+   box(g,0x438f98,wx+side*.10,y+raised+2.08,wz,.08,.96,.68);
+   box(g,0xe2b979,wx+side*.16,y+raised+2.08,wz-.40,.10,1.02,.12);
+   box(g,0xe2b979,wx+side*.16,y+raised+2.08,wz+.40,.10,1.02,.12);
+  }
+  box(g,timber,x+side*w*.49,y+raised+1.9,z-d*.48,.12,3.56,.12);
+ }
+ box(g,0xf7e8cd,x,y+raised+3.45,z-d*.52,w+.45,.20,.16);
+ box(g,timber,x,y+raised+3.96,z,w*.12,.14,d*1.44);
+ for(let i=0;i<6;i++)box(g,i%2?0xf5e0bb:roof,x+(i-2.5)*((w+1.3)/6),y+raised+3.92,z+d*.82,.16,.11,2.18);
+ for(const side of [-1,1]){
+  box(g,timber,x+side*(w*.5+.36),y+raised+.94,z+d*1.33,.10,1.15,.10);
+  box(g,0xd9bd91,x+side*w*.24,y+raised+.71,z+d*1.26,.86,.16,.67);
+  add(g,leafGeo,side>0?0x709b6f:0x88b483,x+side*(w*.5+.45),y+raised+.82,z+d*.20,.54,.63,.54);
+  box(g,timber,x+side*w*.50,y+raised+.68,z+d*.55,.12,.34,d*1.65);
+ }
+ box(g,timber,x,y+raised+1.35,z+d*1.50,w+1.55,.10,.10);
+ for(let i=0;i<3;i++)box(g,0xe5c797,x,y+raised-.05-i*.16,z+d*1.70+i*.38,w*.75-i*.16,.14,.38);
+}
+function createReefChapel(t){
+ const g=new THREE.Group();g.name='翡翠環礁 · 主島海濱大教堂';g.position.set(t.x,t.h,t.z);
+ const plaster=0xf0dfbc,trim=0xffedc9,stone=0xc9ba91,teal=0x427e83,roof=0x4a9b9d;
+ box(g,stone,0,.26,0,13,.52,17);
+ box(g,plaster,0,4.65,0,10.6,8.6,13.7);
+ for(const side of [-1,1]){
+  box(g,trim,side*5.47,4.7,0,.36,8.75,14.1);
+  for(const zz of [-4.25,0,4.25]){
+   box(g,teal,side*5.69,5.35,zz,.12,3.45,1.75);
+   add(g,roundGeo,0xb4dcce,side*5.76,7.10,zz,.13,.83,.9);
+   box(g,trim,side*5.77,5.35,zz,.15,.16,2.1);
+   box(g,trim,side*5.77,3.83,zz,.15,.16,2.1);
+  }
+ }
+ const naveRoof=add(g,roofGeo,roof,0,10.65,0,6.55,3.15,7.5);naveRoof.rotation.y=Math.PI/2;
+ for(const side of [-1,1])for(let i=0;i<5;i++)box(g,side<0?0xd2bd91:trim,side*5.72,9.25,-5.5+i*2.7,.24,.25,.30);
+ box(g,stone,0,1.0,8.25,6.1,2.0,6.0);
+ box(g,plaster,0,7.0,8.25,5.0,12.2,5.0);
+ for(let level=0;level<3;level++){
+  const yy=2.8+level*3.6;
+  for(const side of [-1,1])for(const axis of [-1,1])box(g,trim,side*2.24,yy,8.25+axis*2.20,.23,3.35,.24);
+  box(g,stone,0,yy+1.67,8.25,5.45,.24,5.45);
+ }
+ box(g,0x315c62,0,10.95,10.87,1.72,2.80,.18);
+ add(g,roundGeo,0xeac885,0,11.08,10.99,.70,.82,.30);
+ box(g,trim,0,13.42,8.25,6.0,.48,6.0);
+ add(g,coneGeo,roof,0,15.35,8.25,3.6,3.6,3.6);
+ box(g,0xd6b878,0,18.20,8.25,.30,2.2,.32);
+ box(g,0xd6b878,0,18.60,8.25,1.25,.29,.32);
+ box(g,teal,0,3.17,7.18,2.35,4.7,.20);
+ add(g,roundGeo,0x93c9c2,0,5.54,7.28,1.17,1.04,.16);
+ for(let i=0;i<7;i++)box(g,i%2?0xe8d0a0:trim,0,.18+i*.17,11.3+i*.48,4.1-i*.14,.18,.48);
+ for(let i=0;i<5;i++)box(g,i%2?0xd8c69a:0xf4e3ba,0,.10,14.8+i*.77,3.8-i*.26,.13,.68);
+ for(const side of [-1,1]){
+  add(g,roundGeo,0xbba883,side*3.9,.36,12.4,.93,.36,.93);
+  add(g,leafGeo,side<0?0x73a876:0x88b37e,side*3.9,.92,12.4,1.05,.65,.95);
+  box(g,0x8f7758,side*4.75,1.25,10.6,.17,2.0,.17);
+  add(g,roundGeo,0xf6d6a0,side*4.75,2.32,10.6,.35,.42,.35);
+ }
+ instanceKit(g);return g;
+}
+function createReefPier(r){
+ const g=new THREE.Group();g.name='翡翠環礁 · 木棧碼頭';
+ const u={x:Math.cos(r.angle),z:Math.sin(r.angle)},v={x:-u.z,z:u.x};
+ for(let i=0;i<32;i++){
+  const radius=126+i*.98,x=u.x*radius,z=u.z*radius;
+  const plank=box(g,i%5===0?0xcda77a:0xe0bf8a,x,.88,z,5.0,.18,.83);plank.rotation.y=-r.angle+Math.PI/2;
+  if(i%4===0)for(const side of [-1,1]){
+   const px=x+v.x*side*2.65,pz=z+v.z*side*2.65;
+   box(g,0x8b7258,px,.16,pz,.25,2.2,.25);
+   add(g,roundGeo,0xf0deaf,px,1.32,pz,.23,.15,.23);
+  }
+ }
+ for(const side of [-1,1]){
+  const x=u.x*143+v.x*side*4.6,z=u.z*143+v.z*side*4.6;
+  const landing=box(g,0xd7b98a,x,.92,z,3.2,.22,4.8);landing.rotation.y=-r.angle+Math.PI/2;
+ }
+ instanceKit(g);return g;
+}
+function reefVillageSlots(){
+ const slots=[];
+ for(const t of TERRAIN.filter(t=>t.region==='reef')){
+  const main=t.seed===32,count=main?2:t.rx>=11?2+(t.seed%3===0?1:0):t.rx>=8&&t.seed%3===0?2:1;
+  for(let i=0;i<count;i++){
+   const angle=t.seed*1.31+i*Math.PI*2/count,rad=main?13:count===1?0:Math.min(t.rx,t.rz)*.36;
+   slots.push({slot:t.seed*3+i,islandSeed:t.seed,x:t.x+Math.cos(angle)*rad,z:t.z+Math.sin(angle)*rad,y:t.h,heading:angle+Math.PI/2});
+  }
+ }
+ return slots;
+}
 export function villageSlots(r,rows=3){
+ if(r.id==='reef')return reefVillageSlots();
  const u={x:Math.cos(r.angle),z:Math.sin(r.angle)},v={x:-u.z,z:u.x},offset=REGIONS.indexOf(r);
  const slots=[];
  for(let row=0;row<rows;row++)for(let j=-3;j<=3;j++){
@@ -444,9 +552,149 @@ function addRegionalLandmark(g,t,r){
   box(g,0x516a70,x,y+7.7,z,12,.62,1.8);
  }
 }
+function createReefTerrain(t){
+ const g=new THREE.Group();g.name=`翡翠環礁 · 手塑淺灘島 ${t.seed}`;
+ const n=t.seed===32?48:28,phase=t.seed*1.37;
+ const rings=[[-1.62,1.54],[-.78,1.43],[-.19,1.29],[.23,1.17],[.76,1.08],[Math.max(1.15,t.h*.58),.97],[t.h-.09,.83],[t.h,.82]];
+ const pos=[],col=[],idx=[],outline=[];
+ const tones=[0x8ec7b2,0xb8d7ae,0xe2d6a3,0xf0ddb1,0xe9d5a3,0xd6c494,0xb4bd89,0xe8d4a5];
+ for(let k=0;k<rings.length;k++)for(let j=0;j<n;j++){
+  const a=j/n*Math.PI*2;
+  const irregular=1+.105*Math.sin(a*3+phase)+.066*Math.cos(a*5-phase*.47)+.035*Math.sin(a*8+phase*.8)+.018*Math.cos(a*13-phase);
+  const bite=1-.12*Math.exp(-Math.pow(Math.sin(a*2+phase*.3)*3,2));
+  const radius=rings[k][1]*irregular*bite*(1+.018*Math.sin(k*1.8+a*7+phase));
+  const x=Math.cos(a)*t.rx*radius,z=Math.sin(a)*t.rz*radius;
+  const y=rings[k][0]+(k>1&&k<6?.09*Math.sin(a*9+k+phase):0);
+  pos.push(x,y,z);
+  const tint=new THREE.Color(tones[k]).multiplyScalar(.94+.05*Math.sin(a*6+phase+k*.7));col.push(tint.r,tint.g,tint.b);
+  if(k===rings.length-1)outline.push(new THREE.Vector2(x,-z));
+ }
+ for(let k=0;k<rings.length-1;k++)for(let j=0;j<n;j++){
+  const a=k*n+j,b=k*n+(j+1)%n;idx.push(a,b,a+n,b,b+n,a+n);
+ }
+ const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));geo.setAttribute('color',new THREE.Float32BufferAttribute(col,3));geo.setIndex(idx);geo.computeVertexNormals();
+ const shoal=new THREE.Mesh(geo,new THREE.MeshStandardMaterial({color:0xffffff,vertexColors:true,roughness:.96,flatShading:true,side:THREE.DoubleSide}));shoal.name=`環礁水下沙坡 ${t.seed}`;shoal.position.set(t.x,0,t.z);shoal.castShadow=shoal.receiveShadow=true;g.add(shoal);
+ const cap=new THREE.Mesh(new THREE.ShapeGeometry(new THREE.Shape(outline)),material(t.seed%3===0?0xe8d7aa:0xedddb7));cap.rotation.x=-Math.PI/2;cap.position.set(t.x,t.h+.025,t.z);cap.castShadow=cap.receiveShadow=true;g.add(cap);
+ // Sand remains visible around a broken, grass-covered center, so every
+ // island reads as a beach rather than a copied green cylinder.
+ for(let i=0;i<(t.seed===32?34:5);i++){
+  const a=i*2.399+phase,rad=.18+(i%4)*.115;
+  const x=t.x+Math.cos(a)*t.rx*rad,z=t.z+Math.sin(a)*t.rz*rad;
+  const patch=add(g,leafGeo,i%3===0?0x8faa68:i%2?0x6f9e70:0xa5b979,x,t.h+.11,z,t.seed===32?3.35:1.15,.14,t.seed===32?2.75:1.0);patch.rotation.y=a;
+ }
+ // Partly submerged sand tongues and coral heads make the turquoise lagoon
+ // legible through the transparent water without closing the sailing gaps.
+ for(let i=0;i<7;i++){
+  const a=i*2.399+phase*.47,reach=1.13+(i%3)*.13;
+  const x=t.x+Math.cos(a)*t.rx*reach,z=t.z+Math.sin(a)*t.rz*reach;
+  const tongue=add(g,leafGeo,i%2?0xe8d8a7:0xcbd2a3,x,-.79+(i%3)*.26,z,1.8+(i%3)*.45,.22,1.45+(i%2)*.35);tongue.rotation.y=a;
+  for(let j=0;j<3;j++){
+   const ca=a+j*2.1,cx=x+Math.cos(ca)*(.42+j*.24),cz=z+Math.sin(ca)*(.38+j*.23);
+   const stem=add(g,stoneGeo,(i+j)%3===0?0xeea692:(i+j)%3===1?0x93c8b4:0xe0c08d,cx,-.68,cz,.14,.63+(j%2)*.25,.14);stem.rotation.z=Math.cos(ca)*.23;
+   add(g,leafGeo,j%2?0xf2b9a0:0xa7d3b6,cx,-.27,cz,.32,.15,.28);
+   add(g,leafGeo,(i+j)%2?0xe2a88e:0x87bda9,cx+Math.cos(ca)*.38,-.56,cz+Math.sin(ca)*.33,.57,.34,.49);
+   if(j===1||j===2){const coral=add(g,cragGeo,j===1?0xed8d79:0x81b9aa,cx+Math.cos(ca)*.68,-.70,cz+Math.sin(ca)*.59,.82,.42,.68);coral.rotation.y=ca;}
+  }
+ }
+ for(let i=0;i<6;i++){
+  const a=i*2.399+phase*.23,reach=1.38+(i%2)*.10;
+  const x=t.x+Math.cos(a)*t.rx*reach,z=t.z+Math.sin(a)*t.rz*reach;
+  const garden=add(g,leafGeo,i%3===0?0xd9877d:i%3===1?0x91c4ab:0xe6b692,x,-1.62,z,1.75+(i%3)*.45,.31,1.55+(i%2)*.50);garden.rotation.y=a;
+  for(let k=0;k<3;k++)add(g,leafGeo,k%2?0xf0a894:0xa2d1b3,x+Math.cos(a+k*2.1)*.80,-1.29,z+Math.sin(a+k*2.1)*.68,.39,.31,.36);
+ }
+ for(let i=0;i<6;i++){
+  const a=i*2.399+phase*.8,x=t.x+Math.cos(a)*t.rx*.73,z=t.z+Math.sin(a)*t.rz*.73;
+  const pebble=add(g,cragGeo,i%2?0xd9c89a:0xb6b98c,x,t.h+.12,z,.46+(i%3)*.16,.27,.40+(i%2)*.13);pebble.rotation.y=a;
+ }
+ instanceKit(g);return g;
+}
+// Build one continuous, submerged shelf for each annotated resort cluster.
+// A network of wide shoal corridors joins the island skirts under water; it
+// never becomes a surface bridge or a new collision obstacle for ships.
+export function createReefClusterBeds(){
+ const group=new THREE.Group();group.name='翡翠環礁 · 共用水下礁台';
+ const main=TERRAIN.find(t=>t.seed===32),step=2;
+ const smoothstep=t=>{const v=THREE.MathUtils.clamp(t,0,1);return v*v*(3-2*v);};
+ for(const cluster of REEF_CLUSTER_BEDS){
+  const islands=cluster.seeds.map(seed=>TERRAIN.find(t=>t.seed===seed));
+  if(islands.some(t=>!t))throw new Error(`Missing reef island in ${cluster.id} cluster`);
+  // A short minimum-spanning network keeps every underwater bank connected
+  // without filling the entire lagoon or swallowing the church's main island.
+  const reached=new Set([islands[0]]),links=[];
+  while(reached.size<islands.length){
+   let nearest=null;
+   for(const a of reached)for(const b of islands){
+    if(reached.has(b))continue;
+    const distance=Math.hypot(a.x-b.x,a.z-b.z);
+    if(!nearest||distance<nearest.distance)nearest={a,b,distance};
+   }
+   links.push(nearest);reached.add(nearest.b);
+  }
+  const field=(x,z)=>{
+   let d=Infinity;
+   for(const t of islands){
+    const rx=t.rx*1.75+2,rz=t.rz*1.75+2;
+    d=Math.min(d,(Math.hypot((x-t.x)/rx,(z-t.z)/rz)-1)*Math.min(rx,rz));
+   }
+   for(const {a,b,distance} of links){
+    const dx=b.x-a.x,dz=b.z-a.z,u=THREE.MathUtils.clamp(((x-a.x)*dx+(z-a.z)*dz)/(distance*distance),0,1);
+    const width=11.5+2.5*Math.sin(u*Math.PI);
+    d=Math.min(d,Math.hypot(x-a.x-dx*u,z-a.z-dz*u)-width);
+   }
+   // Softly broken shoreline, rather than a copied oval around every islet.
+   d+=.85*Math.sin(x*.24+z*.11)*Math.sin(z*.19-x*.07)+.38*Math.sin(x*.47-z*.31);
+   // Keep the shared foundations out of the main church island's footprint.
+   const outsideMain=Math.hypot((x-main.x)/(main.rx*1.28),(z-main.z)/(main.rz*1.28))-1;
+   return Math.max(d,-outsideMain*15);
+  };
+  const margin=27,minX=Math.floor((Math.min(...islands.map(t=>t.x-t.rx*1.75))-margin)/step)*step;
+  const maxX=Math.ceil((Math.max(...islands.map(t=>t.x+t.rx*1.75))+margin)/step)*step;
+  const minZ=Math.floor((Math.min(...islands.map(t=>t.z-t.rz*1.75))-margin)/step)*step;
+  const maxZ=Math.ceil((Math.max(...islands.map(t=>t.z+t.rz*1.75))+margin)/step)*step;
+  const width=Math.round((maxX-minX)/step),depth=Math.round((maxZ-minZ)/step);
+  const samples=[];
+  for(let j=0;j<=depth;j++)for(let i=0;i<=width;i++){
+   const x=minX+i*step,z=minZ+j*step;samples.push({x,z,d:field(x,z)});
+  }
+  const positions=[],colors=[];
+  const pushVertex=point=>{
+   const shelf=smoothstep(-point.d/6.5);
+   const ripple=.055*Math.sin(point.x*.39+point.z*.16)+.035*Math.cos(point.z*.44-point.x*.10);
+   const y=-2.075+1.36*shelf+ripple*shelf;
+   positions.push(point.x,y,point.z);
+   const color=new THREE.Color(0x70afa2).lerp(new THREE.Color(0xe7d8aa),shelf*.92);
+   color.multiplyScalar(.92+.08*Math.sin(point.x*.32)*Math.cos(point.z*.27));
+   colors.push(color.r,color.g,color.b);
+  };
+  const emitTriangle=(a,b,c)=>{
+   let polygon=[a,b,c],clipped=[];
+   for(let k=0;k<polygon.length;k++){
+    const p=polygon[k],q=polygon[(k+1)%polygon.length],inside=p.d<=0,nextInside=q.d<=0;
+    if(inside)clipped.push(p);
+    if(inside!==nextInside){const u=p.d/(p.d-q.d);clipped.push({x:p.x+(q.x-p.x)*u,z:p.z+(q.z-p.z)*u,d:0});}
+   }
+   for(let k=1;k<clipped.length-1;k++){pushVertex(clipped[0]);pushVertex(clipped[k]);pushVertex(clipped[k+1]);}
+  };
+  for(let j=0;j<depth;j++)for(let i=0;i<width;i++){
+   const p=j*(width+1)+i,a=samples[p],b=samples[p+1],c=samples[p+width+1],d=samples[p+width+2];
+   // Winding faces upward so the shallow sand catches sunlight through water.
+   emitTriangle(a,d,b);emitTriangle(a,c,d);
+  }
+  const geo=new THREE.BufferGeometry();
+  geo.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));
+  geo.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));
+  geo.computeVertexNormals();
+  const bed=new THREE.Mesh(geo,new THREE.MeshStandardMaterial({color:0xffffff,vertexColors:true,roughness:1,flatShading:true,side:THREE.DoubleSide}));
+  bed.name=`翡翠環礁 · ${cluster.name}共用水下礁台`;
+  bed.userData.memberSeeds=[...cluster.seeds];bed.userData.links=links.map(({a,b})=>[a.seed,b.seed]);
+  bed.receiveShadow=true;group.add(bed);
+ }
+ return group;
+}
 export function createTerrainBase(t){
  const g=new THREE.Group(),r=REGIONS.find(r=>r.id===t.region);g.name=`${r.name} cliff ${t.seed}`;
  if(r.id==='redrock')return createRedrockTerrain(t);
+ if(r.id==='reef')return createReefTerrain(t);
  // A single shared contour through every stratum prevents the offset, rotated-column look.
  const harbor=r.id==='harbor',n=harbor?48:24,phase=t.seed*1.73;
  const rings=harbor?[[-1.35,1.06],[-.28,1.015],[.18,.97],[t.h*.14,.95],[t.h*.28,.90],[t.h*.43,.88],[t.h*.55,.90],[t.h*.70,.84],[t.h*.84,.83],[t.h-.18,.79],[t.h,.785]]:[[-1.25,1.10],[.15,1.015],[t.h*.20,.99],[t.h*.40,.91],[t.h*.61,.94],[t.h*.82,.855],[t.h-.15,.79],[t.h,.77]];
@@ -742,18 +990,66 @@ function createRedrockPort(r){
 }
 export function createVillageBase(r){
  const g=new THREE.Group();g.name=r.village;const homes=new THREE.Group();g.add(homes);g.userData.homes=homes;const u={x:Math.cos(r.angle),z:Math.sin(r.angle)},v={x:-u.z,z:u.x};
- for(const s of villageSlots(r,2)){const h=new THREE.Group();house(h,r,0,s.y,0,s.slot,false);h.position.set(s.x,0,s.z);h.rotation.y=s.heading;homes.add(h);}
+ for(const s of villageSlots(r,2)){const h=new THREE.Group();if(r.id==='reef')reefCottage(h,0,s.y,0,s.slot,false);else house(h,r,0,s.y,0,s.slot,false);h.position.set(s.x,0,s.z);h.rotation.y=s.heading;homes.add(h);}
  if(r.id==='harbor')g.add(createHarborPort(r),createHarborSkyhouse(1,0),createHarborSkyhouse(3,4));
  else if(r.id==='redrock')g.add(createRedrockPort(r));
+ else if(r.id==='reef'){
+  g.add(createReefChapel(TERRAIN.find(t=>t.seed===32)),createReefPier(r));
+ }
  else{
   const dock=box(g,0xb38b58,u.x*140,1.1,u.z*140,5,.5,18);dock.rotation.y=-r.angle+Math.PI/2;
   for(let k=0;k<5;k++)for(const s of [-1,1])box(g,0x70533d,u.x*(133+k*3)+v.x*s*2.1,.25,u.z*(133+k*3)+v.z*s*2.1,.3,2.5,.3);
  }
- for(let k=0;k<13;k++){const r0=143+k*.83,stair=box(g,0xc8aa7c,u.x*r0,1.3+k*.34,u.z*r0,4,.45,.9);stair.rotation.y=-r.angle+Math.PI/2;}
+ if(r.id!=='reef')for(let k=0;k<13;k++){const r0=143+k*.83,stair=box(g,0xc8aa7c,u.x*r0,1.3+k*.34,u.z*r0,4,.45,.9);stair.rotation.y=-r.angle+Math.PI/2;}
  consolidateChunk(homes);instanceKit(g);return g;
 }
 export function* detailsForRegion(r){
  const u={x:Math.cos(r.angle),z:Math.sin(r.angle)},v={x:-u.z,z:u.x};
+ if(r.id==='reef'){
+  for(const s of villageSlots(r)){
+   const home=new THREE.Group();reefCottage(home,0,s.y,0,s.slot,true);home.position.set(s.x,0,s.z);home.rotation.y=s.heading;instanceKit(home);yield home;
+  }
+  for(const t of TERRAIN.filter(t=>t.region==='reef')){
+   const garden=new THREE.Group(),count=t.seed===32?29:5+(t.seed%3);
+   for(let i=0;i<count;i++){
+    const a=i*2.399+t.seed*.87,rad=.53+(i%3)*.105;
+    const x=t.x+Math.cos(a)*t.rx*rad,z=t.z+Math.sin(a)*t.rz*rad;
+    if(i%4===0){
+     add(garden,leafGeo,i%2?0x4e8a72:0x78a765,x,t.h+.35,z,.95,.60,.82);
+     for(let k=0;k<4;k++)add(garden,leafGeo,k%2?0xe8a890:0xffd5a3,x+Math.sin(k*1.57)*.68,t.h+.76,z+Math.cos(k*1.57)*.67,.16,.15,.16);
+    }else if(i%5===2){
+     add(garden,coneGeo,0x4f8463,x,t.h+.90,z,.42,1.65,.42);
+     for(let k=0;k<6;k++){
+      const angle=k*1.047+i*.17,leaf=add(garden,leafGeo,k%2?0x71a969:0x91b878,x+Math.cos(angle)*.87,t.h+1.86+(k%2)*.12,z+Math.sin(angle)*.84,1.30,.29,.47);leaf.rotation.y=-angle;leaf.rotation.z=Math.cos(angle)*.15;
+     }
+    }else if(i%5===3){
+     for(let k=0;k<5;k++){
+      const angle=k*1.257+i*.35;
+      add(garden,leafGeo,k%2?0x4d8d6c:0x7bae77,x+Math.cos(angle)*.46,t.h+.54,z+Math.sin(angle)*.45,.72,.52,.65);
+      add(garden,leafGeo,k%2?0xf3b297:0xffdbad,x+Math.cos(angle)*.56,t.h+.98,z+Math.sin(angle)*.54,.16,.15,.16);
+     }
+    }else tree(garden,x,t.h+.13,z,i+t.seed*3,r,false);
+   }
+   for(let i=0;i<7;i++){
+    const a=i*2.399+t.seed*.54,reach=1.05+(i%3)*.19;
+    const x=t.x+Math.cos(a)*t.rx*reach,z=t.z+Math.sin(a)*t.rz*reach;
+    for(let j=0;j<4;j++){
+     const angle=a+j*1.57,xx=x+Math.cos(angle)*j*.19,zz=z+Math.sin(angle)*j*.19;
+     const branch=add(garden,stoneGeo,j%3===0?0xeea28e:j%3===1?0x8cc5b4:0xf0c49c,xx,-.62,zz,.11,.55+j*.18,.11);branch.rotation.z=Math.cos(angle)*.25;
+     add(garden,leafGeo,j%2?0xe9b1a0:0xc4d9ae,xx,-.18+j*.10,zz,.27,.13,.25);
+    }
+   }
+   for(let k=0;k<(t.seed===32?6:t.seed%3===0?1:0);k++){
+    const a=t.seed*.67+k*2.399,rad=t.seed===32?.69:.55;
+    const x=t.x+Math.cos(a)*t.rx*rad,z=t.z+Math.sin(a)*t.rz*rad;
+    box(garden,0xa67a53,x,t.h+.95,z,.16,1.9,.16);
+    add(garden,coneGeo,k%2?0xeb8974:0xf3c47b,x,t.h+2.05,z,1.55,.38,1.55);
+    for(const side of [-1,1])add(garden,leafGeo,0xd7bd93,x+side*.65,t.h+.21,z+.45,.66,.14,.40);
+   }
+   instanceKit(garden);yield garden;
+  }
+  return;
+ }
  for(const s of villageSlots(r)){
   const g=new THREE.Group();house(g,r,0,s.y,0,s.slot,true);g.position.set(s.x,0,s.z);g.rotation.y=s.heading;instanceKit(g);yield g;
  }

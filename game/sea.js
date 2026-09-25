@@ -1,18 +1,22 @@
 import * as THREE from 'three';
 import {WAVES,WAVE_GLSL} from '../ship-preview/waves.js';
-import {TERRAIN,CORALHAVEN} from './archipelago-data.js';
+import {TERRAIN,CORALHAVEN,REGIONS} from './archipelago-data.js';
 
 // Signed approximate distance to the authored coasts. Kept in a small texture so
 // the vertex and fragment shaders can share the same shore transition cheaply.
 export function createShoreTexture(size=384){
  const pixels=new Uint8Array(size*size*4);
+ const reef=REGIONS.find(r=>r.id==='reef'),u={x:Math.cos(reef.angle),z:Math.sin(reef.angle)},v={x:-u.z,z:u.x};
  for(let z=0;z<size;z++)for(let x=0;x<size;x++){
   const wx=(x/(size-1)-.5)*512,wz=(z/(size-1)-.5)*512;
   let distance=999;
   for(const land of TERRAIN)distance=Math.min(distance,(Math.hypot((wx-land.x)/land.rx,(wz-land.z)/land.rz)-1)*Math.min(land.rx,land.rz));
   distance=Math.min(distance,(Math.hypot((wx-CORALHAVEN.x)/15,(wz-CORALHAVEN.z)/12)-1)*12);
+  const along=wx*u.x+wz*u.z-144,across=wx*v.x+wz*v.z;
+  const waviness=1+.07*Math.sin(across*.095+along*.07)+.035*Math.cos(across*.17-along*.11);
+  const lagoon=1-THREE.MathUtils.smoothstep(Math.hypot(along/82,across/99)/waviness,.72,1.12);
   const value=Math.round(255*THREE.MathUtils.clamp(distance/18,0,1)),i=(z*size+x)*4;
-  pixels[i]=pixels[i+1]=pixels[i+2]=value;pixels[i+3]=255;
+  pixels[i]=value;pixels[i+1]=Math.round(255*lagoon);pixels[i+2]=value;pixels[i+3]=255;
  }
  const texture=new THREE.DataTexture(pixels,size,size);
  texture.minFilter=texture.magFilter=THREE.LinearFilter;texture.wrapS=texture.wrapT=THREE.ClampToEdgeWrapping;texture.needsUpdate=true;
@@ -42,8 +46,10 @@ const fragmentShader=`
  varying vec3 seaPosition;
  void main(){
   vec2 p=seaPosition.xz;
-  float d=texture2D(shore,p/512.+.5).r;
-  float shallow=1.-smoothstep(.035,.72,d);
+  vec4 shoreData=texture2D(shore,p/512.+.5);
+  float d=shoreData.r;
+  float lagoon=shoreData.g;
+  float shallow=max(1.-smoothstep(.035,.72,d),lagoon*.87);
   float distanceFade=(1.-overview*.9)*(1.-.85*smoothstep(55.,135.,length(cameraPosition.xz-p)));
   float attenuation=mix(.23,1.,smoothstep(.025,.28,d))*strength*distanceFade;
   // Evaluate the normal per pixel. The old 160-cell mesh interpolated normals
@@ -65,6 +71,7 @@ const fragmentShader=`
   float specular=pow(max(dot(normal,normalize(viewDirection+lightDirection)),0.),38.);
   specular*=.84+.16*sin(p.x*.79+sin(p.y*.42)+time*.25)*sin(p.y*.69-p.x*.23);
   vec3 color=mix(vec3(.018,.23,.34),vec3(.045,.59,.59),shallow);
+  color=mix(color,vec3(.07,.69,.60),lagoon*.68);
   color*=.78+diffuse*.25;
   color=mix(color,vec3(.24,.54,.59),fresnel*.26);
   color+=vec3(.58,.85,.82)*specular*.024;
@@ -77,7 +84,8 @@ const fragmentShader=`
   float foam=foamLine*smoothstep(.29,.75,breakup)*(.52+.18*sin(time*1.7));
   color=mix(color,vec3(.72,.94,.86),foam*.67);
   // Real alpha blending reveals sand, rock and reef colour beneath the shallows.
-  float alpha=mix(1.,.49,1.-smoothstep(.025,.55,d));
+  float alpha=mix(1.,.49,max(1.-smoothstep(.025,.55,d),lagoon*.82));
+  alpha=mix(alpha,.35,lagoon*.65);
   alpha=min(1.,alpha+fresnel*.18+foam*.23);
   float fog=max(smoothstep(178.,212.,length(p)),smoothstep(65.,165.,length(cameraPosition-seaPosition))*.7*(1.-overview));
   gl_FragColor=vec4(color,alpha);
@@ -90,10 +98,12 @@ const bedFragment=`
  uniform sampler2D shore;
  varying vec2 bedPosition;
  void main(){
-  float d=texture2D(shore,bedPosition/512.+.5).r;
-  float sand=1.-smoothstep(.12,.70,d);
+  vec4 shoreData=texture2D(shore,bedPosition/512.+.5);
+  float d=shoreData.r;
+  float sand=max(1.-smoothstep(.12,.70,d),shoreData.g*.94);
   float mottling=sin(bedPosition.x*.61+sin(bedPosition.y*.39)*1.3)*sin(bedPosition.y*.77-bedPosition.x*.23);
   vec3 floorColor=mix(vec3(.025,.19,.24),vec3(.57,.69,.50),sand);
+  floorColor=mix(floorColor,vec3(.24,.52,.43),shoreData.g*.66);
   floorColor+=vec3(.019,.025,.011)*mottling*sand;
   gl_FragColor=vec4(floorColor,1.);
   #include <tonemapping_fragment>
