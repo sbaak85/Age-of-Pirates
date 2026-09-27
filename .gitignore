@@ -10,3 +10,4 @@ Thumbs.db
 preview-server.log
 preview-server.err.log
 artifacts/
+dist/

@@ -8,6 +8,25 @@
 - GitHub：<https://github.com/sbaak85/Age-of-Pirates>
 - 主分支：`main`
 
+## 公開遊戲頁面
+
+- 遊玩網址：<https://sbaak85.github.io/Age-of-Pirates/>
+- 推送 `main` 後，GitHub Actions 的 **Publish game to GitHub Pages** 會自動驗證、打包並更新網站；也可以在 Actions 手動執行。
+- GitHub 儲存庫的 Settings → Pages → Source 使用 **GitHub Actions**。
+
+網站只打包主遊戲的模組相依、封面、音樂、模型資料和 Three.js 授權。原始 `Assets`、備份、測試及開發預覽不會進入公開網站。發佈時會自動處理 `/Age-of-Pirates/` 子路徑，本機遊戲網址不受影響。
+
+使用 Node.js 22 驗證及產生發佈檔案（不需安裝額外建置套件）：
+
+```sh
+node --test scripts/build-pages.test.mjs
+node scripts/build-pages.mjs
+```
+
+輸出預設為 `dist/`，也可透過 `PAGES_OUTPUT` 指定其他空資料夾。建置程式會拒絕覆寫非空的輸出資料夾；GitHub Actions 每次使用全新環境。
+
+網頁版為單機遊戲，建議使用支援 WebGL 的桌面瀏覽器及鍵盤／手把。存檔保存在該瀏覽器，公開網站與 localhost 的存檔互不共用。
+
 ## 啟動
 
 安裝 Node.js 20 或更新版本後，在 Windows 執行 `啟動海戰紀元.cmd`，或執行：
