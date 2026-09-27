@@ -1,0 +1,4 @@
+#damage-numbers{position:absolute;inset:0;z-index:5;overflow:hidden;pointer-events:none;user-select:none}
+#damage-numbers[hidden],.damage-number[hidden]{display:none}
+.damage-number{position:absolute;color:#fff0bc;font:900 27px/1 "Segoe UI",sans-serif;font-variant-numeric:tabular-nums;letter-spacing:-.04em;white-space:nowrap;transform-origin:center bottom;-webkit-text-stroke:1px #6e3215;paint-order:stroke fill;text-shadow:0 2px 0 #50220f,0 3px 5px #042d3acc;will-change:transform,opacity}
+@media(max-width:600px){.damage-number{font-size:24px}}

@@ -1,0 +1,17 @@
+<!doctype html><html lang="zh-Hant"><meta charset="UTF-8"><title>寶箱大小與金光預覽</title>
+<style>body{margin:0;background:#16414c;color:#ffe9b1;font:16px system-ui}canvas{display:block}header{position:absolute;top:20px;left:24px}footer{position:absolute;bottom:32px;display:flex;width:100%;justify-content:space-around;text-align:center;pointer-events:none}small{display:block;color:#c3d7d8;margin-top:8px}</style>
+<script type="importmap">{"imports":{"three":"/vendor/three/build/three.module.js","three/addons/":"/vendor/three/examples/jsm/"}}</script>
+<header>寶箱預覽 · 尺寸 ×1.2<small>擊殺掉落：20% 金寶箱 · 金幣與零件 ×2</small></header>
+<footer><span>普通擊殺寶箱<small>49 金幣 + 5 零件</small></span><span>金寶箱<small>98 金幣 + 10 零件</small></span><span>場景零件寶箱<small>原獎勵不變</small></span></footer>
+<script type="module">
+import * as T from 'three';import {spawnChest} from './feedback.js';
+const scene=new T.Scene();scene.background=new T.Color(0x16414c);
+scene.add(new T.HemisphereLight(0xffffff,0x32555a,2));const light=new T.DirectionalLight(0xffe6af,3);light.position.set(-5,10,7);scene.add(light);
+const camera=new T.PerspectiveCamera(38,innerWidth/innerHeight,.1,100);camera.position.set(0,7.7,16);camera.lookAt(0,.7,0);
+const renderer=new T.WebGLRenderer({antialias:true});renderer.setPixelRatio(Math.min(devicePixelRatio,1.5));renderer.setSize(innerWidth,innerHeight);renderer.toneMapping=T.ACESFilmicToneMapping;document.body.append(renderer.domElement);
+const water=new T.Mesh(new T.PlaneGeometry(100,100),new T.MeshStandardMaterial({color:0x237c8c,roughness:.35}));water.rotation.x=-Math.PI/2;scene.add(water);
+const chests=[spawnChest(scene,-5,0,0),spawnChest(scene,0,0,0,{golden:true}),spawnChest(scene,5,0,0)];
+chests[2].group.traverse(o=>{if(o.isMesh&&o.material.transparent){o.material.color.setHex(0x4bf7d6);o.material.opacity=.32;}});
+function frame(now){for(const chest of chests)chest.update(now/1000);renderer.render(scene,camera);requestAnimationFrame(frame);}requestAnimationFrame(frame);
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
+</script></html>

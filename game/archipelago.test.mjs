@@ -4,7 +4,7 @@ import {createBoatState,stepBoat} from './physics.js';
 import {createWorld} from './world.js';import * as THREE from 'three';
 import {BUILDING_TYPES,buildingTypeFor,villageSlots,createTerrainBase,createReefClusterBeds,createVillageBase} from './archipelago-art.js';
 import {TERRAIN} from './archipelago-data.js';
-import {createShoreTexture} from './sea.js';
+import {createShoreTexture,SEA_SPAN} from './sea.js';
 test('original handcrafted island is restored beside the first port without blocking pickups',()=>{
  const scene=new THREE.Scene(),world=createWorld(scene),island=world.far.getObjectByName('Coralhaven · original handmade island');
  assert.ok(island);assert.ok(Math.hypot(island.position.x-REGIONS[0].dock.x,island.position.z-REGIONS[0].dock.z)<30);
@@ -17,8 +17,8 @@ test('each port has ten distinct building silhouettes and a stable staggered lay
  assert.equal(BUILDING_TYPES.length,10);
  for(const r of REGIONS.filter(r=>r.id!=='reef')){const slots=villageSlots(r),again=villageSlots(r);assert.deepEqual(slots,again);assert.equal(slots.length,21);assert.equal(new Set(slots.map(s=>buildingTypeFor(r.id,s.slot).id)).size,10);assert.ok(new Set(slots.map(s=>Math.round(s.heading*100))).size>4);}
 });
-test('central canyon cliffs keep their intended long axis',()=>{
- for(const t of TERRAIN.filter(t=>t.seed===51||t.seed===52)){const g=createTerrainBase(t),bounds=new THREE.Box3().setFromObject(g),size=bounds.getSize(new THREE.Vector3());assert.ok(size.z>size.x*1.5,`central cliff ${t.seed} turned sideways`);}
+test('old central canyon meshes are replaced by the jungle',()=>{
+ assert.ok(!TERRAIN.some(t=>[5,6,7,9,25,26,27,29,45,46,47,49,51,52].includes(t.seed)));
 });
 test('emerald reef has separate resort islets, one landmark chapel and a broad translucent lagoon',()=>{
  const region=REGIONS.find(r=>r.id==='reef'),islands=TERRAIN.filter(t=>t.region==='reef'),slots=villageSlots(region);
@@ -36,7 +36,7 @@ test('emerald reef has separate resort islets, one landmark chapel and a broad t
   assert.ok(lowest<-.5&&highest>2,`islet ${t.seed} must slope below and above water`);
  }
  const texture=createShoreTexture(128),pixels=texture.image.data;
- const sample=(x,z)=>{const a=Math.round((x/512+.5)*127),b=Math.round((z/512+.5)*127);return pixels[(b*128+a)*4+1];};
+ const sample=(x,z)=>{const a=Math.round((x/SEA_SPAN+.5)*127),b=Math.round((z/SEA_SPAN+.5)*127);return pixels[(b*128+a)*4+1];};
  assert.ok(sample(region.x,region.z)>sample(0,0)+120,'lagoon shallows do not differ from deep water');texture.dispose();
 });
 test('red and blue resort groups each share one submerged, navigable reef shelf',()=>{
@@ -127,16 +127,16 @@ test('both Warm Sand channels stay navigable below skyhouses and upper cliff wal
  }
 });
 test('five ports, all encounters and loot spawn in accessible water',()=>{
- assert.equal(REGIONS.length,5);assert.equal(ENCOUNTERS.length,34);assert.equal(LOOT.length,40);
+ assert.equal(REGIONS.length,5);assert.equal(ENCOUNTERS.length,42);assert.equal(LOOT.length,40);
  for(const r of REGIONS)assert.ok(navigable(r.dock.x,r.dock.z,3),r.id);
  for(const e of ENCOUNTERS)assert.ok(navigable(...e.start,e.radius),e.id);
  for(const l of LOOT)assert.ok(navigable(l.x,l.z,2),l.id);
  // Complete circumnavigation at 111 U radius with ship clearance.
  for(let i=0;i<720;i++){const a=i*Math.PI/360;assert.ok(navigable(Math.cos(a)*111,Math.sin(a)*111,5));}
- assert.ok(Math.abs(MAP_RADIUS**2/94**2-5)<.02);
+ assert.equal(MAP_RADIUS,400);
 });
 test('grid flood fill reaches every port and treasure from initial spawn',()=>{
- const step=4,min=-208,max=208,n=(max-min)/step+1,key=(x,z)=>x+z*n;
+ const step=4,min=-400,max=400,n=(max-min)/step+1,key=(x,z)=>x+z*n;
  const ix=x=>Math.round((x-min)/step);const queue=[[ix(START.x),ix(START.z)]],seen=new Set([key(...queue[0])]);
  for(let j=0;j<queue.length;j++){const [x,z]=queue[j];for(const [dx,dz] of [[1,0],[-1,0],[0,1],[0,-1]]){const a=x+dx,b=z+dz,k=key(a,b);if(a<0||b<0||a>=n||b>=n||seen.has(k)||!navigable(min+a*step,min+b*step,2))continue;seen.add(k);queue.push([a,b]);}}
  for(const p of [...REGIONS.map(r=>r.dock),...LOOT])assert.ok(seen.has(key(ix(p.x),ix(p.z))),JSON.stringify(p));

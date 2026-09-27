@@ -3,6 +3,7 @@ import { explosionBFragment } from './explosion-b-volume.js';
 import { explosionCFragment } from './explosion-c-volume.js';
 
 const CONFIG={impact:{limit:8,life:1.5,referenceY:.65,size:[4.8,3.87,4.8],center:2.065,chunks:12,sparks:32,shader:explosionCFragment},kill:{limit:3,life:4.2,referenceY:1.1,size:[14,11.87,14],center:6.065,chunks:32,sparks:100,shader:explosionBFragment}};
+export const EXPLOSION_WARMUP_DURATION=Math.max(...Object.values(CONFIG).map(effect=>effect.life));
 export const IMPACT_SCALE=4.5;
 export const MIN_KILL_SCALE=2;
 // Match the main fireball's roughly six-unit peak diameter, not its empty

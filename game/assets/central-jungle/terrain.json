@@ -1,0 +1,11 @@
+{
+  "triangles": 4980,
+  "vertices": 2484,
+  "sourceTriangles": 196628,
+  "simplificationError": 0.0024713182356208563,
+  "continuousTerrain": true,
+  "bridges": 3,
+  "caves": 4,
+  "bounds": 280,
+  "maskSize": 256
+}

@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { createChest } from './models.js';
+import {CHEST_SCALE} from './treasure.js';
 import { CombatExplosions, IMPACT_SCALE, MIN_KILL_SCALE } from './combat-explosions.js';
 import { WaterImpactPool } from './water-impact-pool.js';
 
@@ -92,13 +93,21 @@ export class Effects {
   }
 }
 
-export function spawnChest(scene,x,z,time){
-  const group=createChest();group.position.set(x,.28,z);group.scale.setScalar(.001);scene.add(group);
-  return {group,x,z,born:time,alive:true,update(now){
+export function spawnChest(scene,x,z,time,{golden=false}={}){
+  const group=createChest({golden});group.position.set(x,.28,z);group.scale.setScalar(.001*CHEST_SCALE);scene.add(group);
+  return {group,x,z,golden,born:time,alive:true,update(now){
     const age=now-time;
     const pop=Math.min(1,age/.62),overshoot=1+Math.sin(pop*Math.PI)*.22;
-    group.scale.setScalar(Math.max(.001,pop*overshoot));
+    group.scale.setScalar(CHEST_SCALE*Math.max(.001,pop*overshoot));
     group.position.y=.30+Math.sin(Math.min(1,age/.8)*Math.PI)*.82+Math.sin(age*2.2)*.08;
     group.rotation.y=age*.72;
+    if(golden){
+      group.userData.aura.material.opacity=.5+Math.sin(age*2.8)*.12;
+      for(const [i,spark] of group.userData.sparks.entries()){
+        const phase=(age*.43+i/6)%1,angle=i*2.4+age*.3;
+        spark.position.set(Math.cos(angle)*(.7+phase*.3),.6+phase*1.4,Math.sin(angle)*(.7+phase*.3));
+        spark.scale.setScalar(.3+Math.sin(phase*Math.PI)*.7);spark.rotation.y=age+i;
+      }
+    }
   }};
 }

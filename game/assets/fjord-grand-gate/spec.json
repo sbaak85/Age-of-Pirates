@@ -1,0 +1,20 @@
+{
+  "triangles": 4356,
+  "dimensions": [
+    45.162674857624154,
+    24.424999999999997,
+    12.199999809265137
+  ],
+  "previousDimensions": [
+    31.16999999463558,
+    18.525000005960464,
+    5.6
+  ],
+  "opening": {
+    "width": 24,
+    "crownHeight": 16,
+    "springHeight": 4
+  },
+  "passageSamples": 54,
+  "status": "preview-only"
+}

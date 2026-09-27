@@ -1,6 +1,16 @@
 #startup{position:fixed;inset:0;z-index:10000;background:#000;color:#fff;display:grid;place-items:center;font-family:Georgia,serif;isolation:isolate;transition:opacity .65s ease}
 #cover-art{position:absolute;width:100%;height:100%;object-fit:contain;background:#030d14;opacity:0;transition:opacity 1.4s ease;z-index:-1}
 #startup.art-ready #cover-art{opacity:1}
+.cover-title-overlay{position:absolute;left:0;top:0;z-index:0;pointer-events:none;opacity:0;transition:opacity 1.2s ease}
+#startup.art-ready[data-state=cover] .cover-title-overlay{opacity:1}
+.cover-title-copy{mix-blend-mode:screen;filter:drop-shadow(0 0 5px #ffc056);object-fit:fill}
+#startup.art-ready[data-state=cover] .cover-title-copy{opacity:.2}
+.cover-title-glow{background:#ffd678;filter:blur(5px);mix-blend-mode:screen;will-change:opacity;animation:cover-title-pulse 3.8s ease-in-out infinite}
+.cover-title-sweep{overflow:hidden;mix-blend-mode:screen;contain:paint;transform:translateZ(0)}
+.cover-title-sweep::before{content:"";position:absolute;top:-10%;left:-24%;width:24%;height:120%;transform:translate3d(0,0,0) skewX(-17deg);will-change:transform;background:linear-gradient(90deg,transparent 0%,#ffcc73 16%,#fff1bc 33%,#fff 43% 57%,#fff1bc 67%,#ffcc73 84%,transparent 100%);filter:drop-shadow(0 0 14px #fff0a0);animation:cover-gold-sweep 6.4s linear infinite}
+.cover-title-star{position:absolute;width:42px;height:42px;transform:translate(-50%,-50%) scale(0);will-change:transform,opacity;background:radial-gradient(circle,#fff 0 6%,#fff6cb 8%,#ffc04c88 28%,transparent 65%),linear-gradient(90deg,transparent 46%,#fff9e6 49% 51%,transparent 54%),linear-gradient(0deg,transparent 46%,#fff9e6 49% 51%,transparent 54%);filter:drop-shadow(0 0 7px #ffe29b);mix-blend-mode:screen;animation:cover-title-star 7.7s ease-in-out infinite}
+#startup:not([data-state=cover]) .cover-title-overlay,#startup:not([data-state=cover]) .cover-title-star,#startup:not([data-state=cover]) .cover-title-sweep::before{animation-play-state:paused;will-change:auto}
+.cover-title-debug{background:#ff00d0}
 #cover-fallback{font-size:clamp(32px,7vw,100px);color:#eac47b;text-shadow:0 4px 25px #000;z-index:-2}
 #startup.art-ready #cover-fallback{visibility:hidden}
 #startup button{font:inherit;color:#ffe8b8;cursor:pointer;border:0;outline:none!important;box-shadow:none;background:transparent;-webkit-tap-highlight-color:transparent}
@@ -14,11 +24,41 @@
 #startup-progress::-webkit-progress-value{background:#e2bd76;border-radius:8px;transition:width .3s}
 #startup-percent{font:13px system-ui;color:#beccc9}
 #startup[data-state=loading] #cover-art,#startup[data-state=error] #cover-art{opacity:0;transition-duration:.6s}
+#startup[data-state=loading] .cover-title-overlay,#startup[data-state=error] .cover-title-overlay{opacity:0;transition-duration:.6s}
 #startup[data-state=loading] #cover-fallback,#startup[data-state=error] #cover-fallback{visibility:hidden}
 #startup[data-state=loading] #continue-button,#startup[data-state=error] #continue-button{display:none}
 #startup[data-state=loading] #startup-loading,#startup[data-state=error] #startup-loading{display:block}
 #startup-retry{position:absolute;top:64%;padding:16px 30px;border:1px solid #a88850!important;border-radius:4px}
 #startup[hidden]{display:none}
+#startup.exit-requested{animation:cover-timeout-reveal 4.65s linear forwards;will-change:opacity}
+@keyframes cover-timeout-reveal{0%,86.021505%{opacity:1}100%{opacity:0}}
+/* Input opens after one second; the invisible hit box follows the logo artwork. */
+#continue-button[hidden],#cover-logo-button[hidden]{display:none}
+#cover-logo-button{position:absolute;z-index:2;padding:0}
+#startup[data-state=departing] #continue-button,#startup[data-state=departing] #cover-logo-button,#startup[data-state=loading] #cover-logo-button,#startup[data-state=revealing] #continue-button,#startup[data-state=revealing] #cover-logo-button,#startup[data-state=error] #cover-logo-button{display:none}
+#startup[data-state=departing] #cover-art{opacity:0;transition:opacity 1s ease-in-out}
+#startup[data-state=departing] .cover-title-overlay{opacity:0;transition:opacity 1s ease-in-out}
+#startup[data-state=departing] #cover-fallback{opacity:0;transition:opacity 1s}
+#startup[data-state=departing] .cover-title-glow{animation:none}
+#startup[data-state=revealing] #cover-art,#startup[data-state=revealing] .cover-title-overlay{opacity:0;transition:none}
+#startup[data-state=revealing] #cover-fallback{visibility:hidden}
+/* Terminal cover states must remove the artwork, not merely fade it. The glow
+   animation is restored when departing ends and a paused keyframe can otherwise
+   override opacity:0, leaving the title behind the loading bar. */
+#startup:is([data-state=loading],[data-state=revealing],[data-state=error]) :is(#cover-art,.cover-title-overlay){display:none;animation:none;transition:none}
+#startup:is([data-state=loading],[data-state=revealing],[data-state=error]) .cover-title-overlay *,#startup:is([data-state=loading],[data-state=revealing],[data-state=error]) .cover-title-sweep::before{animation:none;will-change:auto}
+#startup .cover-title-impact,#startup .cover-title-echo,#startup .cover-title-echo-secondary{opacity:0;object-fit:fill;mix-blend-mode:screen;transform-origin:50% 55%;transition:none;pointer-events:none}
+#startup.art-ready[data-state=cover] .cover-title-impact,#startup.art-ready[data-state=cover] .cover-title-echo,#startup.art-ready[data-state=cover] .cover-title-echo-secondary{opacity:0}
+.cover-title-impact{filter:brightness(7) drop-shadow(0 0 12px #ffe7a3)}
+.cover-title-echo,.cover-title-echo-secondary{filter:brightness(4) drop-shadow(0 0 7px #ffde84)}
+#startup[data-state=departing] .cover-title-impact{animation:cover-impact .65s ease-out both;will-change:opacity,transform}
+#startup[data-state=departing] .cover-title-echo{animation:cover-echo .95s cubic-bezier(.12,.6,.2,1) both;will-change:opacity,transform}
+#startup[data-state=departing] .cover-title-echo-secondary{animation:cover-echo .78s .12s cubic-bezier(.12,.6,.2,1) both;will-change:opacity,transform}
+@keyframes cover-impact{0%{opacity:1;transform:scale(1)}12%{opacity:1;transform:scale(1.025)}100%{opacity:0;transform:scale(1.065)}}
+@keyframes cover-echo{0%{opacity:.95;transform:scale(1)}20%{opacity:.75}100%{opacity:0;transform:scale(1.48)}}
 @keyframes cover-breathe{0%,100%{opacity:.5;transform:translateY(0)}50%{opacity:1;transform:translateY(-3px)}}
-@media(prefers-reduced-motion:reduce){#startup *,#startup{animation:none;transition-duration:.05s}}
+@keyframes cover-title-pulse{0%,100%{opacity:.14}50%{opacity:.3}}
+@keyframes cover-gold-sweep{0%{transform:translate3d(0,0,0) skewX(-17deg)}46%,100%{transform:translate3d(516.666667%,0,0) skewX(-17deg)}}
+@keyframes cover-title-star{0%,2%,13%,100%{transform:translate(-50%,-50%) scale(0);opacity:0}6%{transform:translate(-50%,-50%) scale(1);opacity:1}9%{transform:translate(-50%,-50%) scale(.75);opacity:.65}}
+@media(prefers-reduced-motion:reduce){#startup *,#startup{animation:none;transition-duration:.05s}.cover-title-sweep::before{animation:none;opacity:0}.cover-title-star{animation:none;opacity:0}}
 

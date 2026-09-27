@@ -1,18 +1,26 @@
+import {FJORD_ISLAND_SOLIDS,fjordIslandBlocked,fjordIslandProjectileBlocked} from './fjord-island-navigation.js';
+import {fjordIslandToWorld} from './fjord-island-placement.js';
+import {centralBlocked,CENTRAL_ROWS,CENTRAL_GRID} from './central-navigation.js';
 import { directionalInput } from './directional-controls.js';
-import {REGIONS,TERRAIN,START,ENCOUNTERS,LOOT,WHIRLPOOLS,regionAt,isHarborSafeZone,isReefKrakenExclusion,isEnemyPositionRestricted,dockAt,whirlpoolForce,upgradeOffer,specialtyOffer} from './archipelago-data.js';
+import {REGIONS,TERRAIN,START,ENCOUNTERS,LOOT,WHIRLPOOLS,regionAt,isHarborSafeZone,isEnemyPositionRestricted,dockAt,whirlpoolForce,upgradeOffer,specialtyOffer} from './archipelago-data.js';
 import {createTargetStreamer} from './target-stream.js';
 import { createSailController } from './sail-rig.js';
 import * as THREE from 'three';
 import { createShip } from '../ship-preview/ship.js';
 import { sampleBoatPose, sampleWaveHeight } from '../ship-preview/waves.js';
-import { createWorld } from './world.js';
+import { createWorldAsync } from './world.js';
 import { createTargetModel } from './models.js';
 import { WEAPONS, WEAPON_IDS, normalizeLoadout, weaponForSide } from './weapons.js';
 import { applyEdgeFog, batchStatic } from './optimization.js';
 import { mountUpgradeUI } from './interface.js';
 import { Sound, Effects, spawnChest } from './feedback.js';
-import { targetExplosionSize } from './combat-explosions.js';
+import {rollKillTreasure,chestRewards} from './treasure.js';
+import { targetExplosionSize, EXPLOSION_WARMUP_DURATION } from './combat-explosions.js';
+import { createTitleExplosionWarmup } from './title-explosion-warmup.js';
+import { reloadIndicatorState } from './reload-indicator.js';
+import { createDamageNumbers } from './damage-numbers.js';
 import { stepKrakenCombat, KRAKEN_MELEE } from './kraken-combat.js';
+import {isKrakenExclusion,scheduleKrakenRespawn,respawnKrakens} from './kraken-population.js';
 import { PLAYER, CANNON, ENEMY_CANNON, TARGET_DEFS, WORLD_RADIUS } from './constants.js';
 import { clamp, damp, distance, forward, right, nearestSide, sideOf, createBoatState, stepBoat, createVolley, dueVolleyShots } from './physics.js';
 
@@ -28,6 +36,19 @@ document.querySelector('.mission-kicker').textContent='A2 環狀峽灣 / 五港�
 document.querySelector('#controls-hint').textContent='W/S 航行 · A/D 轉向 · 空白 開砲 · F 帆 · M 航海圖 · Enter 港口 | 手把 A 開砲 · Y 帆 · X 港口 · View 航海圖';
 const domCache=new Map();
 const $=selector=>{if(!domCache.has(selector))domCache.set(selector,document.querySelector(selector));return domCache.get(selector);};
+const damageNumbers=createDamageNumbers($('#damage-numbers'));
+let krakenAnnouncementUntil=0;
+function updateKrakenPopulation(){
+ const revived=respawnKrakens(targets,gameTime);
+ if(!revived.length)return;
+ for(const t of revived){
+  if(!t.model.loaded)continue;
+  t.model.group.visible=true;t.model.group.scale.copy(t.baseScale);
+  t.model.group.rotation.set(0,t.yaw,0);t.model.group.position.set(t.x,t.baseY,t.z);
+ }
+ $('#kraken-announcement').textContent=`海域警報：${revived.map(t=>t.location).join('、')}的克拉肯已重新現身！`;
+ krakenAnnouncementUntil=gameTime+5;
+}
 const settingsKey='age-of-pirates-settings-v1',progressKey='age-of-pirates-progress-v1';
 function readStore(key,fallback){try{return {...fallback,...JSON.parse(localStorage.getItem(key)||'{}')};}catch{return {...fallback};}}
 const settings=readStore(settingsKey,{volume:.65,shake:true,rumble:true,guide:true,quality:'balanced',stats:false,fov:54,cameraX:23,cameraHeight:27.2,cameraZ:27,controlMode:'A'});
@@ -44,7 +65,33 @@ const camera=new THREE.PerspectiveCamera(settings.fov,innerWidth/innerHeight,.1,
 const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'});
 renderer.setPixelRatio(Math.min(devicePixelRatio,1.5));renderer.setSize(innerWidth,innerHeight);renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.20;
 renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.domElement.tabIndex=0;renderer.domElement.setAttribute('aria-label','海戰紀元遊戲畫面');$('#scene').appendChild(renderer.domElement);
-const world=createWorld(scene),sound=new Sound(),effects=new Effects(scene);
+const sound=new Sound();
+// Render the actual reusable effect pool into a hidden target, even if the
+// three-second cover deadline expires. Never expose warmup bursts in the menu.
+const warmupScene=new THREE.Scene(),effectsRoot=new THREE.Group();
+warmupScene.add(effectsRoot,new THREE.HemisphereLight(0xe0fff2,0x8c7259,1.35));
+const effects=new Effects(effectsRoot),warmupTarget=new THREE.WebGLRenderTarget(256,256);
+const warmupSide=right(START.yaw);
+const titleExplosionWarmup=createTitleExplosionWarmup(effects,[
+ {kind:'impact',x:START.x-warmupSide.x*4.5,y:1.2,z:START.z-warmupSide.z*4.5},
+ {kind:'kill',x:START.x+warmupSide.x*4.5,y:1.2,z:START.z+warmupSide.z*4.5},
+],EXPLOSION_WARMUP_DURATION);
+// Start playing the warmup immediately, in parallel with island/asset loading.
+const warmupCamera=camera.clone();
+warmupCamera.position.set(START.x+23,27.2,START.z+27);warmupCamera.lookAt(START.x,1,START.z);
+let warmupPrevious=performance.now();
+function warmCombat(now){
+ const dt=Math.min(.05,Math.max(0,(now-warmupPrevious)/1000));warmupPrevious=now;
+ titleExplosionWarmup.update(dt,warmupCamera,true);
+ renderer.setRenderTarget(warmupTarget);renderer.render(warmupScene,warmupCamera);renderer.setRenderTarget(null);
+ if(titleExplosionWarmup.complete){scene.add(effectsRoot);warmupTarget.dispose();}
+ else requestAnimationFrame(warmCombat);
+}
+requestAnimationFrame(warmCombat);
+const world=await createWorldAsync(scene);
+const startLead=$('#start-panel .lead'),readyText=startLead.textContent;startLead.textContent='正在載入中央叢林秘境…';
+try{await world.loadCentral();startLead.textContent=readyText;}catch(error){startLead.textContent='中央秘境載入失敗，請重新整理重試。';throw error;}
+
 renderer.shadowMap.autoUpdate=false;
 let shadowTimer=0,performanceTimer=0,smoothedFps=60;
 let playerBatch={before:0,after:0};
@@ -89,6 +136,9 @@ function pointerMenu(){menuMode='pointer';menuItems().forEach(el=>el.classList.r
 function activateMenuItem(el){if(!el)return;if(el.classList.contains('setting')){const input=el.querySelector('input[type=checkbox]');input?.click();}else if(el.tagName==='BUTTON')el.click();}
 function upgrades(){boat.maxHp=PLAYER.maxHp+save.hull*25;boat.speedBonus=save.speed*.08;boat.damageBonus=save.cannon*4;}
 function resetVoyage(){
+  damageNumbers.clear();
+  krakenAnnouncementUntil=0;
+  for(const t of targets){t.respawnAt=null;t.defeatedOnce=false;}
   effects.clear();targetStreamer.reset();visited=new Set();collectedLoot.clear();
   krakenWarning.visible=false;for(const target of targets)target.melee=null;
   while(projectiles.length)removeProjectile(projectiles.length-1);
@@ -170,16 +220,21 @@ function damagePlayer(amount,x,z,y=.7,kind='cannon'){
 }
 function damageTarget(target,amount,x,z,y=.65){
   if(!target.alive)return;
+  const previousHealth=target.health;
   target.health=Math.max(0,target.health-amount);target.damageFlash=.28;
+  damageNumbers.spawn(target,previousHealth-target.health,gameTime);
   sound.hit();
   if(target.health>0){effects.explosion(x,y,z,'impact');return;}
   target.alive=false;target.sinkAt=gameTime;target.sinkY=target.model.group.position.y;
-  if(!target.optional)kills++;
-  const chest=spawnChest(scene,target.x,target.z,visualTime);
-  chest.reward=target.reward;chest.optional=!!target.optional;chests.push(chest);
+  scheduleKrakenRespawn(target,gameTime);
+  if(!target.optional&&!target.defeatedOnce)kills++;
+  target.defeatedOnce=true;
+  const treasure=rollKillTreasure(target.reward,2+(REGIONS.find(r=>r.id===target.region)?.tier??1));
+  const chest=spawnChest(scene,target.x,target.z,visualTime,{golden:treasure.golden});
+  chest.rewards={gold:treasure.gold,parts:treasure.parts};chest.optional=!!target.optional;chests.push(chest);
   const blast=targetExplosionSize(target.model.group);
   effects.explosion(blast.center.x,blast.center.y-1.3*blast.scale,blast.center.z,'kill',blast.scale);sound.kill();shakeAmount=Math.max(shakeAmount,.30);
-  notify(`${target.name} 已擊敗！寶箱落海`,2.6);
+  notify(`${target.name} 已擊敗！${treasure.golden?'金寶箱':'寶箱'}落海`,2.6);
 }
 function segmentDistance(px,pz,x1,z1,x2,z2){
   const dx=x2-x1,dz=z2-z1,len=dx*dx+dz*dz;
@@ -203,6 +258,7 @@ function updateProjectiles(dt){
         if(segmentDistance(t.x,t.z,p.previousX,p.previousZ,p.x,p.z)<t.radius+CANNON.radius){damageTarget(t,p.damage,p.x,p.z,p.mesh.position.y);hit=true;break;}
       }
     }else if(segmentDistance(boat.x,boat.z,p.previousX,p.previousZ,p.x,p.z)<PLAYER.radius+.26){damagePlayer(p.damage,p.x,p.z,p.mesh.position.y);hit=true;}
+    if(!hit&&fjordIslandProjectileBlocked(p.x,p.z,p.mesh.position.y)){effects.explosion(p.x,p.mesh.position.y,p.z,'impact');hit=true;}
     if(!hit&&TERRAIN.some(t=>p.mesh.position.y<t.h&&Math.hypot((p.x-t.x)/t.rx,(p.z-t.z)/t.rz)<1)){effects.explosion(p.x,p.mesh.position.y,p.z,'impact');hit=true;}
     if(!hit&&p.age>=p.life){effects.water.spawn(p.x,sampleWaveHeight(p.x,p.z,visualTime,1,true),p.z);sound.burst(.32,.055,180,1600);hit=true;}
     if(!hit&&Math.hypot(p.x,p.z)>WORLD_RADIUS+10)hit=true;
@@ -222,7 +278,7 @@ function updateTargets(dt){
     }
     const dx=boat.x-t.x,dz=boat.z-t.z,dist=Math.hypot(dx,dz);
     const previousX=t.x,previousZ=t.z;
-    const melee=t.type==='octopus'?stepKrakenCombat(t,boat,gameTime,safe||isReefKrakenExclusion(boat.x,boat.z)):null;
+    const melee=t.type==='octopus'?stepKrakenCombat(t,boat,gameTime,safe||isKrakenExclusion(boat.x,boat.z)):null;
     if(melee?.started){notify('克拉肯抬起觸手！駛離紅色揮擊區域',1.6);sound.burst(.38,.08,90,450);}
     if(melee?.strike&&!inDock()){
       const fx=melee.hit?boat.x:t.x+Math.cos(t.melee.heading)*8,fz=melee.hit?boat.z:t.z-Math.sin(t.melee.heading)*8;
@@ -242,11 +298,12 @@ function updateTargets(dt){
     const speed=melee&&(melee.engaged||melee.locked)?melee.speed:t.speed*(t.hostile&&dist<7?.48:1),step=speed*dt;
     const nx=t.x+Math.cos(t.yaw)*step,nz=t.z-Math.sin(t.yaw)*step;
     let blocked=Math.hypot(nx,nz)>WORLD_RADIUS-5||isEnemyPositionRestricted(t,nx,nz);
+    if(centralBlocked(nx,nz,t.radius*.55)||fjordIslandBlocked(nx,nz,t.radius*.55))blocked=true;
     for(const o of world.obstacles){const rx=o.rx+t.radius*.55,rz=o.rz+t.radius*.55;if(((nx-o.x)/rx)**2+((nz-o.z)/rz)**2<1){blocked=true;break;}}
     if(blocked&&!melee?.locked)t.yaw+=Math.PI*.65*dt;else if(!blocked){t.x=nx;t.z=nz;}
     const separation=t.radius+PLAYER.radius+.5,overlap=Math.hypot(t.x-boat.x,t.z-boat.z);
     if(overlap<separation){const outward=overlap>.001?{x:(t.x-boat.x)/overlap,z:(t.z-boat.z)/overlap}:right(boat.yaw);t.x=boat.x+outward.x*separation;t.z=boat.z+outward.z*separation;}
-    if(isEnemyPositionRestricted(t,t.x,t.z)){t.x=previousX;t.z=previousZ;}
+    if(isEnemyPositionRestricted(t,t.x,t.z)||centralBlocked(t.x,t.z,t.radius*.55)||fjordIslandBlocked(t.x,t.z,t.radius*.55)){t.x=previousX;t.z=previousZ;}
     t.model.group.position.y=0;
     t.model.animate(visualTime+t.patrol*.3,t.type==='shark'?(t.fleeing&&dist<24?'burst':'cruise'):melee?.age);
     const bob=t.model.group.position.y;
@@ -274,10 +331,12 @@ function updateChests(dt){
     if(d<5&&visualTime-c.born>.65){const pull=Math.min(1,dt*4);c.x+=(boat.x-c.x)*pull;c.z+=(boat.z-c.z)*pull;c.group.position.x=c.x;c.group.position.z=c.z;}
     if(d>2.05||visualTime-c.born<.7)continue;
     disposeChest(c);chests.splice(i,1);
-    if(c.lootId)collectedLoot.add(c.lootId);if(c.kind==='parts')save.parts+=c.reward;else{save.gold+=c.reward;runGold+=c.reward;}if(!c.optional)collected++;
+    const reward=chestRewards(c);
+    if(c.lootId)collectedLoot.add(c.lootId);save.parts+=reward.parts;save.gold+=reward.gold;runGold+=reward.gold;if(!c.optional)collected++;
     boat.hp=Math.min(boat.maxHp,boat.hp+8);persist();
-    effects.burst(c.x,.7,c.z,'treasure',28);sound.chest();notify(`獲得 ${c.reward} ${c.kind==='parts'?'零件':'金'} · 船體修復 8`);
-    if(kills===ENCOUNTERS.length)notify('全海域威脅清除！可繼續探索或返回村莊整備。',4);
+    const rewardText=[reward.gold?`${reward.gold} 金幣`:'',reward.parts?`${reward.parts} 零件`:''].filter(Boolean).join('、');
+    effects.burst(c.x,.7,c.z,'treasure',c.golden?42:28);sound.chest();notify(`${c.golden?'金寶箱！':''}獲得 ${rewardText} · 船體修復 8`);
+    if(kills===ENCOUNTERS.length)notify('所有目標均已擊敗！克拉肯仍會重生，可繼續探索或返回村莊。',4);
   }
 }
 function updateGuide(){
@@ -296,8 +355,10 @@ function updateGuide(){
   return near;
 }
 function drawMinimap(canvas=minimap){
- const c=canvas.getContext('2d'),w=canvas.width,m=w/2,scale=(m-10)/210;c.clearRect(0,0,w,w);c.save();c.beginPath();c.arc(m,m,m-2,0,Math.PI*2);c.clip();c.fillStyle='#145a68';c.fillRect(0,0,w,w);
+ const c=canvas.getContext('2d'),w=canvas.width,m=w/2,scale=(m-10)/WORLD_RADIUS;c.clearRect(0,0,w,w);c.save();c.beginPath();c.arc(m,m,m-2,0,Math.PI*2);c.clip();c.fillStyle='#145a68';c.fillRect(0,0,w,w);
  for(const o of world.obstacles){c.fillStyle='#9caf8a';c.beginPath();c.ellipse(m+o.x*scale,m+o.z*scale,o.rx*scale,o.rz*scale,0,0,Math.PI*2);c.fill();}
+ c.fillStyle='#9caf8a';for(let row=0;row<CENTRAL_ROWS.length;row++){const runs=CENTRAL_ROWS[row];for(let j=0;j<runs.length;j+=2)c.fillRect(m+(CENTRAL_GRID.min+runs[j]*CENTRAL_GRID.step)*scale,m+(CENTRAL_GRID.min+row*CENTRAL_GRID.step)*scale,(runs[j+1]-runs[j])*CENTRAL_GRID.step*scale,CENTRAL_GRID.step*scale+.3);}
+ for(const land of FJORD_ISLAND_SOLIDS){c.fillStyle='#9caf8a';c.beginPath();land.points.forEach(([x,z],i)=>{const p=fjordIslandToWorld(x,z);if(i)c.lineTo(m+p.x*scale,m+p.z*scale);else c.moveTo(m+p.x*scale,m+p.z*scale);});c.closePath();c.fill();}
  for(const r of REGIONS){c.fillStyle=visited.has(r.id)?'#80efbc':'#ffd782';c.beginPath();c.arc(m+r.dock.x*scale,m+r.dock.z*scale,4,0,Math.PI*2);c.fill();if(w>200){c.font='12px system-ui';c.fillStyle='white';c.fillText(r.village,m+r.dock.x*scale+6,m+r.dock.z*scale);}}
  for(const v of WHIRLPOOLS){c.strokeStyle='#ca9af6';c.beginPath();c.arc(m+v.x*scale,m+v.z*scale,v.radius*scale,0,Math.PI*2);c.stroke();}
  for(const t of targets){if(!t.alive)continue;c.fillStyle=t.hostile?'#ef795f':'#a5e6bf';c.beginPath();c.arc(m+t.x*scale,m+t.z*scale,2,0,Math.PI*2);c.fill();}
@@ -313,27 +374,33 @@ function updateUi(near){
   const port=dockAt(boat.x,boat.z);$('#dock-prompt').textContent=port?port.village+' · X / Enter 整備':'港口整備';
   $('#nearest').textContent=near.target?`最近目標：${near.target.name} · ${Math.round(near.distance)} m`:'尋找海域目標';
   $('#side-name').textContent=side===1?'右舷':'左舷';$('#side-symbol').textContent=side===1?'▶':'◀';$('#side-mode').textContent=manualSide?'手動選側':'自動選側';
-  const elapsed=volley?gameTime-volley.finishedAt:0,ready=!volley||gameTime>=volley.reloadUntil;
-  $('#reload-text').textContent=ready?'準備開火':volley.shotsFired<4?`${volley.shotsFired} / 4 發射中`:`填裝 ${Math.max(0,volley.reloadUntil-gameTime).toFixed(1)}s`;
-  $('#reload-fill').style.width=`${ready?100:volley.shotsFired<4?volley.shotsFired*25:clamp(elapsed/volley.weapon.reload*100,0,100)}%`;
-  $('#gun-state').textContent=ready?`${currentWeapon(side).name} · 四門就緒`:volley.shotsFired<4?'依序發射 · 每門間隔 0.3 秒':`${volley.weapon.name} · 填裝中`;
   $('#dock-prompt').classList.toggle('hidden',phase!=='playing'||!inDock());
   $('#hurt').style.opacity=String(hitFlash*.40);
   if(visualTime>toastUntil)$('#toast').style.opacity='0';
   drawMinimap();
   const insideVortex=WHIRLPOOLS.some(v=>Math.hypot(boat.x-v.x,boat.z-v.z)<v.radius);
   if(insideVortex){$('#nearest').textContent='漩渦吸引中！張帆並朝外持續加速';}
-  $('#boundary-warning').classList.toggle('hidden',phase!=='playing'||Math.hypot(boat.x,boat.z)<188);
+  $('#boundary-warning').classList.toggle('hidden',phase!=='playing'||Math.hypot(boat.x,boat.z)<WORLD_RADIUS-22);
+}
+function updateReloadPanel(){
+  const firing=!!volley&&volley.shotsFired<CANNON.volleyCount;
+  const ready=!volley||(!firing&&gameTime>=volley.reloadUntil);
+  const progress=firing?0:ready?1:clamp((gameTime-volley.finishedAt)/volley.weapon.reload,0,1);
+  $('#reload-text').textContent=firing?`${volley.shotsFired} / ${CANNON.volleyCount} 發射中`:ready?'準備開火':`填裝 ${Math.max(0,volley.reloadUntil-gameTime).toFixed(1)}s`;
+  $('#reload-panel .reload-bar').classList.toggle('hidden',firing);
+  $('#reload-fill').style.width=`${progress*100}%`;
+  $('#gun-state').textContent=firing?'依序發射 · 每門間隔 0.3 秒':ready?`${currentWeapon(side).name} · 四門就緒`:`${volley.weapon.name} · 填裝中`;
 }
 const occlusionProbe=new THREE.PerspectiveCamera();
 function updateCamera(dt){
   const f=forward(boat.yaw),look=new THREE.Vector3(boat.x+f.x*3,0,boat.z+f.z*3);
   occlusionProbe.position.set(boat.x+settings.cameraX,settings.cameraHeight,boat.z+settings.cameraZ);
+  world.updateCentralOcclusion(occlusionProbe,playerModel.position,boat.yaw,dt);
   world.occlusion.update(occlusionProbe,renderer,playerModel.position,dt,true,boat.yaw);
-  const desired=new THREE.Vector3(boat.x+settings.cameraX,settings.cameraHeight*world.occlusion.heightMultiplier,boat.z+settings.cameraZ);
+  const desired=new THREE.Vector3(boat.x+settings.cameraX,settings.cameraHeight*world.cameraHeightMultiplier,boat.z+settings.cameraZ);
   const factor=1-Math.exp(-2.1*dt);camera.position.lerp(desired,factor);
   if(settings.shake&&shakeAmount>.001){camera.position.x+=(Math.random()-.5)*shakeAmount;camera.position.y+=(Math.random()-.5)*shakeAmount*.7;}
-  camera.lookAt(look);shakeAmount*=Math.exp(-8*dt);
+  camera.lookAt(look);world.frameCentralOcclusion(camera,playerModel.position);shakeAmount*=Math.exp(-8*dt);
 }
 function updatePlayerVisual(){
   sailController.update(boat.sailDeployment,gameTime);
@@ -361,7 +428,7 @@ function inputVector(pad){
 }
 function disposeChest(chest){
   scene.remove(chest.group);
-  chest.group.traverse(o=>{if(o.isMesh){o.geometry.dispose();if(o.material.transparent)o.material.dispose();}});
+  chest.group.traverse(o=>{if(o.isMesh||o.isSprite){if(o.isMesh)o.geometry.dispose();if(o.material.transparent)o.material.dispose();}});
 }
 function updateLoadout(){
   for(const key of ['port','starboard']){
@@ -392,6 +459,26 @@ function applyQuality(){
   $('#stats').checked=settings.stats;
 }
 const labelPosition=new THREE.Vector3();
+const damagePosition=new THREE.Vector3();
+function projectDamageAnchor(target){
+  // The same world anchor as the HP label; its health track is 18px below the name.
+  damagePosition.set(target.x,target.type==='ship'?5.5:3.4,target.z).project(camera);
+  return {x:(damagePosition.x*.5+.5)*innerWidth,y:(-damagePosition.y*.5+.5)*innerHeight+18,
+    visible:Math.abs(damagePosition.z)<1&&Math.abs(damagePosition.x)<1.05&&Math.abs(damagePosition.y)<1.1};
+}
+const reloadPosition=new THREE.Vector3();
+function updateShipReloadIndicator(){
+  const indicator=$('#ship-reload'),state=reloadIndicatorState(volley,gameTime);
+  if(phase!=='playing'||!state.visible){indicator.hidden=true;return;}
+  reloadPosition.set(playerModel.position.x,playerModel.position.y+reloadAnchorHeight,playerModel.position.z).project(camera);
+  if(Math.abs(reloadPosition.x)>1||Math.abs(reloadPosition.y)>1||Math.abs(reloadPosition.z)>1){indicator.hidden=true;return;}
+  indicator.hidden=false;
+  indicator.style.left=`${(reloadPosition.x*.5+.5)*innerWidth}px`;
+  indicator.style.top=`${(-reloadPosition.y*.5+.5)*innerHeight}px`;
+  indicator.style.opacity=String(state.opacity);
+  $('#ship-reload-progress').style.strokeDashoffset=String((1-state.progress)*100);
+  const status=$('#ship-reload-status');if(status.textContent!==state.text)status.textContent=state.text;
+}
 function updateTargetLabels(){
   // Project with this frame's final camera, not the previous render matrix.
   camera.updateMatrixWorld();
@@ -433,22 +520,39 @@ function frame(now){
   const actualDt=Math.max(.001,(now-previous)/1000),dt=Math.min(.05,actualDt);previous=now;visualTime+=dt;
   smoothedFps=damp(smoothedFps,1/actualDt,2,dt);
   const pad=gamepadUpdate();
+  const cover=$('#startup');
+  const covered=phase==='title'&&window.pirateStartup?.active&&!cover.hidden&&cover.dataset.state!=='error'&&cover.style.opacity!=='0';
+  // Finish the real GPU warmup, then leave the opaque cover to the compositor.
+  // Keep polling input; the next frame renders normally as soon as the cover fades.
+  if(covered&&titleExplosionWarmup.complete&&world.stats().loaded>0&&world.stats().building===0){
+    $('#start-button').disabled=false;
+    window.pirateStartup.report(100,'Ready to sail');
+    if(cover.dataset.renderState!=='idle')cover.dataset.renderState='idle';
+    requestAnimationFrame(frame);return;
+  }
+  if(covered&&cover.dataset.renderState!=='warming')cover.dataset.renderState='warming';
   if(phase==='playing'){
-    gameTime+=dt;targetStreamer.update(boat);stepBoat(boat,inputVector(pad),dt,world.obstacles);
+    gameTime+=dt;updateKrakenPopulation();targetStreamer.update(boat);stepBoat(boat,inputVector(pad),dt,world.obstacles);
     let vortexDamage=0;for(const v of WHIRLPOOLS)vortexDamage+=whirlpoolForce(boat,v,dt);if(vortexDamage>0){boat.hp=Math.max(0,boat.hp-vortexDamage);hitFlash=Math.max(hitFlash,.15);if(boat.hp<=0)showResult(false);}
     updateTargets(dt);
     for(const index of dueVolleyShots(volley,gameTime))fireCannon(index,volley.side);
+    updateReloadPanel();
     updateProjectiles(dt);updateChests(dt);hitFlash=Math.max(0,hitFlash-dt);
     const near=updateGuide();uiTimer-=dt;if(uiTimer<=0){updateUi(near);uiTimer=.08;}
   }else{guide.visible=false;marker.visible=false;}
-  world.update(visualTime,dt,boat);updatePlayerVisual();updateCamera(dt);effects.update(phase==='playing'?dt:0,camera);
+  world.update(visualTime,dt,boat);updatePlayerVisual();updateCamera(dt);
+  if(titleExplosionWarmup.complete)effects.update(phase==='playing'?dt:0,camera);
 
   for(const cannon of shipParts.cannons){cannon.userData.recoil=Math.max(0,(cannon.userData.recoil||0)-dt*4);cannon.position.z=-cannon.userData.side*Math.sin(cannon.userData.recoil*Math.PI*.5)*.13;}
   shadowTimer-=dt;if(shadowTimer<=0){renderer.shadowMap.needsUpdate=true;shadowTimer=settings.quality==='high'?.033:.10;}
-  updateTargetLabels();
+  updateTargetLabels();updateShipReloadIndicator();
+  damageNumbers.update(gameTime,projectDamageAnchor,phase==='playing');
+  $('#kraken-announcement').hidden=phase!=='playing'||gameTime>=krakenAnnouncementUntil;
   renderer.render(scene,camera);requestAnimationFrame(frame);
-  if(window.pirateStartup?.active)window.pirateStartup.report(world.stats().loaded>0?100:75,world.stats().loaded>0?'Ready to sail':'Building your home port');
-  performanceTimer-=dt;if(performanceTimer<=0){performanceTimer=.5;$('#performance').textContent=`${Math.round(smoothedFps)} FPS · 區塊 ${world.stats().loaded}/5 · 近敵 ${targetStreamer.count()} · ${renderer.info.render.calls} draws · ${Math.round(renderer.info.render.triangles/1000)}k 三角形`;$('#performance').classList.toggle('hidden',!settings.stats);}
+  const startupComplete=titleExplosionWarmup.complete&&world.stats().loaded>0&&world.stats().building===0;
+  if(startupComplete)$('#start-button').disabled=false;
+  window.pirateStartup?.report(startupComplete?100:75+Math.round(titleExplosionWarmup.progress*20),startupComplete?'Ready to sail':'Preparing harbor and combat effects');
+  performanceTimer-=dt;if(performanceTimer<=0){performanceTimer=.5;$('#performance').textContent=`${Math.round(smoothedFps)} FPS · 區塊 ${world.stats().loaded+1}/5 · 近敵 ${targetStreamer.count()} · ${renderer.info.render.calls} draws · ${Math.round(renderer.info.render.triangles/1000)}k 三角形`;$('#performance').classList.toggle('hidden',!settings.stats);}
 }
 
 $('#port-special').addEventListener('click',buySpecial);
@@ -512,6 +616,7 @@ window.gameDebug=()=>({phase,x:boat.x,z:boat.z,yaw:boat.yaw,speed:boat.speed,hp:
 shipParts.sailGroup.userData.dynamic=true;
 for(const cannon of shipParts.cannons){cannon.userData.dynamic=true;cannon.traverse(o=>{if(o.userData.weaponBarrel)o.material=o.material.clone();});}
 playerBatch=batchStatic(playerModel);
+const reloadAnchorHeight=new THREE.Box3().setFromObject(playerModel).max.y-playerModel.position.y+3.5;
 for(const target of targets){
   target.baseScale=target.model.group.scale.clone();target.baseY=target.model.group.position.y;
   const label=document.createElement('div');label.className='target-label';label.hidden=true;

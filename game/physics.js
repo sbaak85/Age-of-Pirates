@@ -1,3 +1,5 @@
+import {resolveFjordIslandMotion} from './fjord-island-navigation.js';
+import {resolveCentralMotion} from './central-navigation.js';
 import { advanceSails, sailEase } from './sail-motion.js';
 import { PLAYER, CANNON, WORLD_RADIUS } from './constants.js';
 
@@ -31,7 +33,10 @@ export function stepBoat(boat,input,dt,obstacles=[]){
   let yawRate=-boat.steering*direction*PLAYER.turnRate*(1+.28*furled)*(.15+.07*furled+(.85-.07*furled)*travel);
   if(directional){
     // Angular speed <= actual travel speed / radius. No stationary pivot.
-    const limit=Math.hypot(boat.vx,boat.vz)/Math.max(.1,boat.minTurnRadius??PLAYER.minTurnRadius);
+    // Contact permits a slow powered turn away from a wall; open-water turning
+    // still obeys the minimum moving turn radius.
+    const contactSpeed=(boat.centralContact||boat.fjordContact)&&Math.abs(throttle)>.05?Math.min(1.2,Math.abs(boat.speed)):0;
+    const limit=Math.max(Math.hypot(boat.vx,boat.vz),contactSpeed)/Math.max(.1,boat.minTurnRadius??PLAYER.minTurnRadius);
     yawRate=clamp(yawRate,-limit,limit);
     if(headingError!==null&&yawRate*headingError>0&&Math.abs(yawRate*dt)>Math.abs(headingError))yawRate=headingError/dt;
   }
@@ -40,6 +45,7 @@ export function stepBoat(boat,input,dt,obstacles=[]){
   const chop=1-.015*Math.sin(boat.x*.38+boat.z*.27);
   boat.vx=damp(boat.vx,f.x*boat.speed*chop,PLAYER.hullResponse*(1+.3*furled),dt);
   boat.vz=damp(boat.vz,f.z*boat.speed*chop,PLAYER.hullResponse*(1+.3*furled),dt);
+  const oldX=boat.x,oldZ=boat.z;
   boat.x+=boat.vx*dt;boat.z+=boat.vz*dt;
   for(const obstacle of obstacles){
     const dx=boat.x-obstacle.x,dz=boat.z-obstacle.z,rx=obstacle.rx+PLAYER.radius,rz=obstacle.rz+PLAYER.radius;
@@ -53,17 +59,23 @@ export function stepBoat(boat,input,dt,obstacles=[]){
     const into=boat.vx*n.x+boat.vz*n.z;
     if(into<0){boat.vx-=into*n.x;boat.vz-=into*n.z;boat.speed*=.72;}
   }
+  if(obstacles.centralCollision)resolveCentralMotion(boat,oldX,oldZ,PLAYER.radius);if(obstacles.fjordCollision)resolveFjordIslandMotion(boat,oldX,oldZ,PLAYER.radius);
   const radius=Math.hypot(boat.x,boat.z);
   if(radius>WORLD_RADIUS){const k=WORLD_RADIUS/radius;boat.x*=k;boat.z*=k;boat.vx*=.35;boat.vz*=.35;boat.speed*=.7;}
   boat.invulnerable=Math.max(0,boat.invulnerable-dt);
   return boat;
 }
-export function createVolley(now,side,weapon=CANNON){return {side,weapon,shotsFired:0,nextShot:now,finishedAt:now+(CANNON.volleyCount-1)*CANNON.volleyInterval,reloadUntil:now+(CANNON.volleyCount-1)*CANNON.volleyInterval+weapon.reload};}
+export function createVolley(now,side,weapon=CANNON){return {side,weapon,shotsFired:0,nextShot:now,finishedAt:null,reloadUntil:Infinity};}
 export function dueVolleyShots(volley,now){
   const shots=[];
   while(volley&&volley.shotsFired<CANNON.volleyCount&&now+1e-6>=volley.nextShot){
     shots.push(volley.shotsFired++);
     volley.nextShot+=CANNON.volleyInterval;
+    if(volley.shotsFired===CANNON.volleyCount){
+      // Reload starts when the final shot actually fires, even on a late frame.
+      volley.finishedAt=now;
+      volley.reloadUntil=now+volley.weapon.reload;
+    }
   }
   return shots;
 }

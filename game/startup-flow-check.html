@@ -1,0 +1,27 @@
+<!doctype html><html><meta charset="utf-8"><title>Title startup flow check</title>
+<style>body{margin:0;background:#061b25;color:#ffe6b0;font:12px monospace}iframe{width:100vw;height:100vh;border:0}pre{position:absolute;top:8px;left:8px;background:#031521e8;padding:12px;pointer-events:none}</style>
+<iframe title="Startup flow"></iframe><pre id="report">Starting early-click check…</pre>
+<script>
+const frame=document.querySelector('iframe'),report=document.querySelector('#report');
+window.addEventListener('message',e=>{if(e.source===frame.contentWindow&&e.data?.type==='startup-check')report.textContent=JSON.stringify(e.data.rows,null,2);});
+fetch('/game/').then(r=>r.text()).then(html=>{
+ const instrument=`<script>
+ const rows=[],begin=performance.now();let clicked=false,last='',layerFailure=false;
+ document.addEventListener('DOMContentLoaded',()=>{
+ const timer=setInterval(()=>{
+ const root=document.querySelector('#startup'),button=document.querySelector('#cover-logo-button');
+ const state=root.hidden?'menu':root.dataset.state;
+ const visibleTitleLayers=[...root.querySelectorAll('#cover-art,.cover-title-overlay')].filter(el=>{
+ const style=getComputedStyle(el);return style.display!=='none'&&style.visibility!=='hidden'&&Number(style.opacity)>0;
+}).map(el=>el.id||el.className);
+ if(state!==last){rows.push({state,ms:Math.round(performance.now()-begin),progress:document.querySelector('#startup-progress').value,visibleTitleLayers});last=state;}
+ if(['loading','revealing','error'].includes(state)&&visibleTitleLayers.length&&!layerFailure){layerFailure=true;rows.push({failure:'Title artwork visible after fade to black',visibleTitleLayers});}
+ if(!clicked&&!button.disabled){rows.push({state:'input-unlocked',ms:Math.round(performance.now()-begin)});clicked=true;button.click();}
+ parent.postMessage({type:'startup-check',rows},'*');
+ if(root.hidden)clearInterval(timer);
+ },16);
+ });
+ <\/script>`;
+ frame.srcdoc=html.replace('<head>','<head><base href="/game/">'+instrument);
+});
+</script></html>

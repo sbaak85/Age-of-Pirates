@@ -1,0 +1,17 @@
+import fs from 'node:fs/promises';
+import assert from 'node:assert/strict';
+import * as T from 'three';
+import {createPoseidon3K} from '../game/poseidon-form-3k.js';
+import {createPoseidonForm,formStats} from '../game/poseidon-form-study.js';
+const root=createPoseidon3K(),stats=formStats(root);
+assert.ok(stats.triangles>=2800&&stats.triangles<=3100);
+root.traverse(o=>{if(!o.isMesh)return;const p=o.geometry.attributes.position;for(const v of p.array)assert.ok(Number.isFinite(v));for(const i of o.geometry.index.array)assert.ok(i>=0&&i<p.count);});
+const original=createPoseidonForm();assert.equal(formStats(original).triangles,500);
+const oldBounds=new T.Box3().setFromObject(original.getObjectByName('胸廓與腰胯')).getSize(new T.Vector3());
+const newBounds=new T.Box3().setFromObject(root.getObjectByName('連續胸背與腰胯')).getSize(new T.Vector3());
+assert.ok(newBounds.z>oldBounds.z*1.3,'Torso depth must visibly increase');
+const saved=root.toJSON();assert.equal(formStats(new T.ObjectLoader().parse(saved)).triangles,stats.triangles);
+await fs.mkdir('game/assets/poseidon-form-3k',{recursive:true});
+await fs.writeFile('game/assets/poseidon-form-3k/scene.json',JSON.stringify(saved));
+await fs.writeFile('game/assets/poseidon-form-3k/triangle-budget.json',JSON.stringify({...stats,torsoDepth:{original:oldBounds.z,refined:newBounds.z}},null,2));
+console.log(JSON.stringify({triangles:stats.triangles,originalTriangles:500,torsoDepth:{original:oldBounds.z,refined:newBounds.z,ratio:newBounds.z/oldBounds.z},roundTrip:'passed'}));

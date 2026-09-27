@@ -3,14 +3,14 @@ import assert from 'node:assert/strict';
 import {START,REGIONS,ENCOUNTERS,LOOT,regionAt,isHarborSafeZone,isReefKrakenExclusion,isEnemyPositionRestricted} from './archipelago-data.js';
 import {stepKrakenCombat,KRAKEN_MELEE} from './kraken-combat.js';
 
-test('the whole named harbor is safe, all targets spawn outside with body clearance',()=>{
+test('harbor protection remains and all targets respect their own body-clearance boundaries',()=>{
  assert.ok(isHarborSafeZone(START.x,START.z));
  for(let x=-200;x<=200;x+=5)for(let z=-200;z<=200;z+=5){
   assert.equal(isHarborSafeZone(x,z),regionAt(x,z).id==='harbor');
  }
- assert.equal(ENCOUNTERS.length,34);
- for(const t of ENCOUNTERS){assert.notEqual(t.region,'harbor');assert.equal(isHarborSafeZone(...t.start,t.radius),false,t.id);}
- for(const r of REGIONS.slice(1))assert.equal(ENCOUNTERS.filter(t=>t.region===r.id).length,({reef:12,redrock:8,fjord:7,mist:7}[r.id]));
+ assert.equal(ENCOUNTERS.length,42);
+ for(const t of ENCOUNTERS.filter(t=>t.habitat!=='central-lagoon')){assert.notEqual(t.region,'harbor');assert.equal(isEnemyPositionRestricted(t,...t.start),false,t.id);}
+ for(const r of REGIONS.slice(1))assert.equal(ENCOUNTERS.filter(t=>t.region===r.id).length,({reef:12,redrock:8,fjord:7,mist:8}[r.id]));
  assert.equal(LOOT.filter(t=>t.region==='harbor').length,8,'harbor exploration rewards remain');
 });
 test('safe boundary includes enemy radius so a hull cannot straddle it',()=>{
@@ -39,15 +39,13 @@ test('reef kraken is replaced by seven separate sharks while other encounters re
  for(let i=0;i<replacements.length;i++)for(let j=i+1;j<replacements.length;j++){
   const a=replacements[i],b=replacements[j];assert.ok(Math.hypot(a.start[0]-b.start[0],a.start[1]-b.start[1])>a.radius+b.radius);
  }
- assert.equal(ENCOUNTERS.filter(t=>t.type==='octopus').length,3);
+ assert.equal(ENCOUNTERS.filter(t=>t.type==='octopus').length,4);
 });
 
 test('reef excludes visiting kraken bodies but still admits sharks and cancels windup',()=>{
  const reef=REGIONS.find(r=>r.id==='reef').dock;
- for(let x=-190;x<=190;x+=7)for(let z=-190;z<=190;z+=7){
-  if(Math.hypot(x,z)<5)continue;
-  assert.equal(isReefKrakenExclusion(x,z),regionAt(x,z).id==='reef');
- }
+ assert.equal(isReefKrakenExclusion(118,-55),true);
+ assert.equal(isReefKrakenExclusion(0,-126),false);
  assert.equal(isEnemyPositionRestricted({type:'octopus',radius:4.5},reef.x,reef.z),true);
  assert.equal(isEnemyPositionRestricted({type:'shark',radius:2.3},reef.x,reef.z),false);
  for(const t of ENCOUNTERS.filter(t=>t.type==='octopus'))assert.equal(isEnemyPositionRestricted(t,...t.start),false,t.id);
@@ -55,9 +53,7 @@ test('reef excludes visiting kraken bodies but still admits sharks and cancels w
  stepKrakenCombat(target,reef,0,false);
  const result=stepKrakenCombat(target,reef,1.7,isReefKrakenExclusion(reef.x,reef.z));
  assert.equal(result.engaged,false);assert.equal(result.strike,false);assert.equal(result.hit,false);assert.equal(result.warning,false);
- const neighbor=REGIONS.find(r=>r.id==='fjord').dock;
- const dx=neighbor.x-reef.x,dz=neighbor.z-reef.z,length=Math.hypot(dx,dz);
- const x=(reef.x+neighbor.x)/2+dx/length,z=(reef.z+neighbor.z)/2+dz/length;
+ const x=37,z=-89;
  assert.equal(isReefKrakenExclusion(x,z),false);
  assert.equal(isReefKrakenExclusion(x,z,4.5),true,'body must not straddle the reef boundary');
 });

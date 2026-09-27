@@ -4,6 +4,18 @@ import { createGameKraken } from './game-kraken.js';
 
 const M=(color,roughness=.72,metalness=0)=>new THREE.MeshStandardMaterial({color,roughness,metalness,side:THREE.DoubleSide});
 const wood=M(0x95552e),lightWood=M(0xce9252),darkWood=M(0x533222),brass=M(0xd5ac60,.35,.55),iron=M(0x364b50,.5,.4),cream=M(0xe8d6aa),glass=M(0x54c7ce,.15,.28);
+const treasureGold=M(0xf5b62f,.26,.65),treasureLid=M(0xffdc70,.24,.55);
+treasureGold.emissive.setHex(0xe9940c);treasureGold.emissiveIntensity=.48;
+treasureLid.emissive.setHex(0xffc542);treasureLid.emissiveIntensity=.55;
+const treasureSpark=new THREE.MeshBasicMaterial({color:0xfff3b5,toneMapped:false});
+const treasureAuraTexture=(()=>{
+ const size=64,data=new Uint8Array(size*size*4);
+ for(let y=0;y<size;y++)for(let x=0;x<size;x++){
+  const r=Math.hypot((x+.5-size/2)/(size/2),(y+.5-size/2)/(size/2)),i=(y*size+x)*4;
+  data[i]=255;data[i+1]=255;data[i+2]=255;data[i+3]=Math.round(255*Math.pow(Math.max(0,1-r),1.8));
+ }
+ const texture=new THREE.DataTexture(data,size,size);texture.magFilter=texture.minFilter=THREE.LinearFilter;texture.needsUpdate=true;return texture;
+})();
 function add(group,geometry,material,x=0,y=0,z=0){const m=new THREE.Mesh(geometry,material);m.position.set(x,y,z);m.castShadow=true;m.receiveShadow=true;group.add(m);return m;}
 function box(group,w,h,d,x,y,z,material){return add(group,new THREE.BoxGeometry(w,h,d),material,x,y,z);}
 function rod(group,a,b,r,material){const aa=new THREE.Vector3(...a),bb=new THREE.Vector3(...b),diff=bb.clone().sub(aa);const m=add(group,new THREE.CylinderGeometry(r*.86,r,diff.length(),9),material);m.position.copy(aa).add(bb).multiplyScalar(.5);m.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),diff.normalize());return m;}
@@ -91,14 +103,26 @@ function submarine(){
 export function createTargetModel(def){
   switch(def.type){case 'ship':return pirateShip(def.color);case 'shark':return createGameShark(def);case 'octopus':return createGameKraken();case 'school':return goldenSchool();case 'submarine':return submarine();default:return pirateShip(def.color);}
 }
-export function createChest(){
-  const group=new THREE.Group();group.name='Treasure chest';
-  box(group,.92,.40,.59,0,.24,0,wood);
-  box(group,.98,.24,.65,0,.59,0,lightWood);
+export function createChest({golden=false}={}){
+  const group=new THREE.Group();group.name=golden?'Golden treasure chest':'Treasure chest';
+  box(group,.92,.40,.59,0,.24,0,golden?treasureGold:wood);
+  box(group,.98,.24,.65,0,.59,0,golden?treasureLid:lightWood);
   for(const z of [-.27,.27]){box(group,.08,.70,.08,0,.38,z,brass);for(const x of [-.34,.34])box(group,.055,.67,.065,x,.38,z,brass);}
   for(const x of [-.36,.36]){box(group,.055,.6,.70,x,.42,0,brass);}
   box(group,.15,.22,.05,.02,.47,.36,brass);
   const lock=add(group,new THREE.TorusGeometry(.05,.014,6,10),darkWood,.02,.48,.39);lock.rotation.y=.05;
   const glow=add(group,new THREE.SphereGeometry(.67,12,8),new THREE.MeshBasicMaterial({color:0xf9b855,transparent:true,opacity:.09,depthWrite:false}),0,.32,0);glow.castShadow=false;
+  if(golden){
+    glow.visible=false;
+    const aura=new THREE.Sprite(new THREE.SpriteMaterial({map:treasureAuraTexture,color:0xffc947,transparent:true,opacity:.5,depthWrite:false,blending:THREE.AdditiveBlending,toneMapped:false}));
+    aura.position.y=.4;aura.scale.set(3.2,3.2,1);group.add(aura);
+    const sparks=[];
+    for(let i=0;i<6;i++){
+      const geometry=new THREE.OctahedronGeometry(.075,0);geometry.scale(.65,1.9,.65);
+      const spark=add(group,geometry,treasureSpark,Math.cos(i*2.4)*.8,.7+i*.18,Math.sin(i*2.4)*.8);
+      spark.castShadow=spark.receiveShadow=false;sparks.push(spark);
+    }
+    group.userData.aura=aura;group.userData.sparks=sparks;
+  }
   return group;
 }

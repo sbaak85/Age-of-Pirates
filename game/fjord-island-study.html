@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>03 蒼壁峽灣・希臘山城平房預覽</title>
+<style>
+*{box-sizing:border-box}body{margin:0;height:100vh;overflow:hidden;background:#102b36;color:#e9e5d7;font:14px system-ui;display:grid;grid-template-columns:275px 1fr}aside{padding:27px 23px;background:#152e39;border-right:1px solid #748f9555;overflow:auto}small{font-size:10px;letter-spacing:2px;color:#b2c9c3}h1{font-size:25px;font-weight:500;line-height:1.35;margin:15px 0}p{line-height:1.75;color:#b8d0cc;font-size:12px}h2{font-size:12px;letter-spacing:1px;font-weight:500;color:#d8c797;margin:29px 0 11px}button{background:#284852;color:#e8e3d4;border:1px solid #738e92;border-radius:5px;padding:10px;cursor:pointer;font:inherit}button[aria-pressed="true"]{background:#657167;border-color:#e5c78a;color:white}button:focus-visible{outline:2px solid #f4db9c}.grid{display:grid;grid-template-columns:1fr 1fr;gap:7px}label{display:block;margin:12px 0;color:#c9d8ce;font-size:12px;cursor:pointer}input{accent-color:#d6c08a;margin-right:6px}.note{border-top:1px solid #69858a5c;margin-top:25px;padding-top:14px}.measure{font-variant-numeric:tabular-nums;color:#f0d99d}main{position:relative;min-width:0}canvas{display:block}.hud{position:absolute;left:23px;top:20px;pointer-events:none;color:#fff8e6;text-shadow:0 2px 5px #12323b;font-size:12px}.hud small{color:#f5e9c5}.foot{position:absolute;bottom:20px;left:23px;right:20px;display:flex;justify-content:space-between;pointer-events:none;color:#e3eadc;text-shadow:0 2px 5px #12323b;font-size:11px}@media(max-width:760px){body{grid-template-columns:185px 1fr}aside{padding:18px 12px}h1{font-size:19px}.grid{grid-template-columns:1fr}button{padding:7px}}
+</style>
+<script type="importmap">{"imports":{"three":"/vendor/three/build/three.module.js","three/addons/":"/vendor/three/examples/jsm/"}}</script>
+</head>
+<body>
+<aside>
+<small>AGE OF PIRATES / AEGEAN HILLSIDE STUDY</small><h1>03 蒼壁峽灣<br>希臘山城街屋</h1>
+<p>住宅以白灰牆、海藍門窗、圓頂與屋頂涼棚塑造希臘海島風格。同一小區的房屋、庭院與擋土牆沿整地軸線排列，主島朝內港、離島朝海溝；牆身提高至約 3.0–3.1 U。石基深入岩坡，短階與石板巷接向公共步道。</p>
+<p class="measure" id="count">建構中…</p><p id="plot-list">整地中…</p><p class="measure" id="walkway-count">鋪設山坡步道中…</p><p class="measure" id="village-count">建造山城平房中…</p>
+<h2>觀察角度</h2><div class="grid"><button data-view="castle" aria-pressed="false">城堡主景</button><button data-view="waterline" aria-pressed="false">水線側視</button><button data-view="harbor" aria-pressed="false">港口近景</button><button data-view="harborTop" aria-pressed="false">港口俯視</button><button data-view="hero" aria-pressed="false">入口全景</button><button data-view="front" aria-pressed="false">正面高度</button><button data-view="plots" aria-pressed="true">主島與港口</button><button data-view="top" aria-pressed="false">群島俯視</button><button data-view="west" aria-pressed="false">西側海岸</button><button data-view="westHomes" aria-pressed="false">西坡平房近景</button><button data-view="eastHomes" aria-pressed="false">東坡平房近景</button><button data-view="rear" aria-pressed="false">外海背坡</button><button data-view="channel" aria-pressed="false">右側海溝</button></div>
+<h2>地形檢查</h2><label><input id="water" type="checkbox" checked>顯示海面</label><label><input id="plots" type="checkbox">標示民居、主堡與港口用地</label><label><input id="wire" type="checkbox">顯示地形線框</label>
+<div class="note"><p>住宅分別坐落在主島與右側離島的既有整地上。房屋的承重石基、後方擋土牆與高低戶短階會依實際岩面高度調整；保留進出平台的公共樓梯及港口航道。</p><p>本頁是獨立建造預覽，主地圖尚未替換；離島三塊住宅地之間的公共樓梯仍待後續規劃。</p></div>
+</aside>
+<main id="viewport"><div class="hud"><small>NEW ISLAND / AEGEAN HILLSIDE VILLAGE</small><br>蒼壁主堡 · 希臘式山城住宅 · 臨港步道</div><div class="foot"><span>拖曳旋轉 · 滾輪縮放 · 右鍵平移</span><span id="hud-summary">建構中…</span></div></main>
+<script type="module" src="./fjord-island-study-preview.js"></script>
+</body></html>
+

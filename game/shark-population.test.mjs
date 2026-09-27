@@ -1,3 +1,4 @@
+import {CENTRAL_HABITAT_RADIUS} from './central-jungle-placement.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
@@ -11,7 +12,7 @@ test('large shark is 50 percent longer, including after animation and batching',
  for(const s of sharks){s.animate(.3,'burst');assert.ok(Number.isFinite(s.tail.rotation.y));assert.ok(s.group.getObjectById(s.body.id));}
 });
 test('random population keeps 6 large / 9 small with clear separated spawns across seeds',()=>{
- const base=ENCOUNTERS.filter(t=>!t.id.startsWith('roaming-shark-'));
+ const base=ENCOUNTERS.filter(t=>!t.id.startsWith('roaming-shark-')&&t.habitat!=='central-lagoon');
  const layouts=[];
  for(let seed=1;seed<=25;seed++){
   let state=seed;const random=()=>((state=(Math.imul(state,1664525)+1013904223)>>>0)/4294967296);
@@ -24,4 +25,17 @@ test('random population keeps 6 large / 9 small with clear separated spawns acro
   layouts.push(JSON.stringify(sharks.map(t=>t.start)));
  }
  assert.equal(new Set(layouts).size,25);
+});
+
+test('central lagoon adds seven separate sharks with clear, confined habitat',()=>{
+ const sharks=ENCOUNTERS.filter(t=>t.habitat==='central-lagoon');
+ assert.equal(sharks.length,7);
+ assert.equal(ENCOUNTERS.filter(t=>t.type==='shark').length,22);
+ for(const t of sharks){
+  assert.ok(navigable(...t.start,t.radius+1),t.id);
+  assert.equal(isEnemyPositionRestricted(t,...t.start),false,t.id);
+  for(const other of sharks.filter(o=>o!==t))assert.ok(Math.hypot(t.start[0]-other.start[0],t.start[1]-other.start[1])>t.radius+other.radius+4);
+  for(let i=0;i<360;i++){const a=i*Math.PI/180;assert.ok(isEnemyPositionRestricted(t,Math.cos(a)*CENTRAL_HABITAT_RADIUS,Math.sin(a)*CENTRAL_HABITAT_RADIUS),'cannot escape through caves');}
+  assert.ok(isEnemyPositionRestricted(t,REGIONS[0].dock.x,REGIONS[0].dock.z),'cannot enter starting port');
+ }
 });

@@ -1,0 +1,19 @@
+<!doctype html><html lang="zh-Hant"><meta charset="utf-8"><title>Title animation performance check</title>
+<style>body{margin:0;background:#061b25;color:#ffe6b0;font:12px monospace}iframe{position:absolute;width:100%;height:100%;border:0}pre{position:absolute;z-index:2;left:12px;top:12px;padding:12px;background:#051621e8;pointer-events:none;white-space:pre-wrap;max-width:440px}</style>
+<iframe title="Title preview" src="/game/"></iframe><pre id="report">Measuring cover frame pacing…</pre>
+<script>
+const frame=document.querySelector('iframe'),report=document.querySelector('#report');
+frame.addEventListener('load',()=>{
+ const win=frame.contentWindow,doc=frame.contentDocument,start=performance.now(),samples=[],longTasks=[];
+ let last=0,observer;
+ try{observer=new win.PerformanceObserver(list=>longTasks.push(...list.getEntries().map(e=>({start:e.startTime,duration:e.duration}))));observer.observe({type:'longtask',buffered:false});}catch{}
+ function sample(now){
+  if(last)samples.push({time:performance.now()-start,ms:now-last,idle:doc.querySelector('#startup')?.dataset.renderState==='idle'});last=now;
+  if(performance.now()-start<14000){win.requestAnimationFrame(sample);return;}
+  observer?.disconnect();
+  const summarize=entries=>{const times=entries.map(e=>e.ms).sort((a,b)=>a-b);return {frames:times.length,medianMs:+(times[Math.floor(times.length*.5)]||0).toFixed(1),p95Ms:+(times[Math.floor(times.length*.95)]||0).toFixed(1),over50ms:times.filter(v=>v>50).length,maxMs:+(times.at(-1)||0).toFixed(1)};};
+  const sweep=doc.querySelector('.cover-title-sweep'),style=sweep?win.getComputedStyle(sweep,'::before'):null;
+  report.textContent=JSON.stringify({first4Seconds:summarize(samples.filter(e=>e.time<4000)),steady10Seconds:summarize(samples.filter(e=>e.time>=4000)),afterWarmup:summarize(samples.filter(e=>e.idle)),longTasks:longTasks.length,longTaskTotalMs:Math.round(longTasks.reduce((sum,e)=>sum+e.duration,0)),sweepTransform:style?.transform,sweepWillChange:style?.willChange,coverState:doc.querySelector('#startup')?.dataset.state,backgroundRenderState:doc.querySelector('#startup')?.dataset.renderState},null,2);
+ }win.requestAnimationFrame(sample);
+});
+</script></html>

@@ -7,6 +7,9 @@
   <link rel="stylesheet" href="/game/style.css">
   <link rel="stylesheet" href="/game/upgrades.css">
   <link rel="stylesheet" href="/game/startup.css">
+  <link rel="stylesheet" href="/game/reload-indicator.css">
+  <link rel="stylesheet" href="/game/damage-numbers.css">
+  <link rel="stylesheet" href="/game/kraken-announcement.css">
   <script type="importmap">{"imports":{"three":"/vendor/three/build/three.module.js","three/addons/":"/vendor/three/examples/jsm/"}}</script>
 </head>
 <body>
@@ -15,12 +18,14 @@
     <div id="cover-fallback">Age of Pirates</div>
     <audio id="cover-music" src="/game/assets/audio/Horizon%20of%20Discovery.mp3" loop preload="auto"></audio>
     <button id="cover-music-enable" type="button" hidden>播放封面音樂</button>
-    <button id="continue-button" type="button">Click to continue</button>
+    <button id="continue-button" type="button" hidden disabled>Click to continue</button>
+    <button id="cover-logo-button" type="button" aria-label="AGE of PIRATES — Continue" hidden disabled></button>
     <div id="startup-loading" role="status" aria-live="polite"><p id="startup-message">Preparing your voyage</p><progress id="startup-progress" max="100" value="0"></progress><span id="startup-percent">0%</span></div>
     <button id="startup-retry" type="button" hidden>Retry loading</button>
   </section>
   <script src="/game/cover-music.js"></script>
   <script src="/game/startup.js"></script>
+  <script src="/game/cover-gold-effects.js"></script>
   <script>
     // Independent recovery if the bootstrap itself cannot be downloaded or parsed.
     setTimeout(function(){if(!window.pirateStartup){var s=document.getElementById('startup');s.dataset.state='error';document.getElementById('startup-message').textContent='Unable to load. Please retry.';var b=document.getElementById('startup-retry');b.hidden=false;b.onclick=function(){location.reload();};}},8000);
@@ -37,6 +42,9 @@
   </header>
   <div id="side-label" class="hidden"><span id="side-symbol">◀</span><strong id="side-name">左舷</strong><small id="side-mode">自動選側</small></div>
   <div id="reload-panel" class="hidden"><div class="reload-title"><span>側舷加農砲</span><strong id="reload-text">準備開火</strong></div><div class="bar reload-bar"><i id="reload-fill"></i></div><small id="gun-state">四門就緒 · 依序齊射</small></div>
+  <div id="ship-reload" hidden aria-hidden="true"><span id="ship-reload-status"></span><svg viewBox="0 0 64 64" aria-hidden="true"><circle class="ship-reload-track" cx="32" cy="32" r="27" pathLength="100"></circle><circle id="ship-reload-progress" class="ship-reload-progress" cx="32" cy="32" r="27" pathLength="100"></circle></svg></div>
+  <div id="damage-numbers" hidden aria-hidden="true"></div>
+  <div id="kraken-announcement" hidden role="status" aria-live="polite"></div>
   <canvas id="minimap" width="184" height="184" class="hidden" aria-label="海域小地圖"></canvas>
   <button id="dock-prompt" class="hidden" type="button">停靠港口 <kbd>Enter</kbd> · 船塢補給</button>
   <div id="toast" role="status" aria-live="polite"></div>
@@ -47,7 +55,8 @@
       <h1>海戰紀元<span>AGE OF PIRATES</span></h1>
       <p class="lead">掌舵穿越環礁，靠船身側舷瞄準，打一輪有份量的加農砲。</p>
       <div class="features"><span>六組巡弋目標</span><span>四砲依序齊射</span><span>寶箱與船塢升級</span></div>
-      <button id="start-button" class="primary">啟航 <span>→</span></button>
+      <button id="start-button" class="primary" disabled>啟航 <span>→</span></button>
+      <p id="startup-background-status" class="menu-note" hidden>正在準備航行…</p>
       <p class="start-controls">手把：左搖桿航行 · 右搖桿選舷 · A 開砲 · Y 張帆／收帆 · Menu 暫停</p>
       <p class="start-controls">鍵鼠：W/S 航行 · A/D 轉舵 · Q/E 選舷 · 空白鍵／滑鼠左鍵 開砲 · F 張帆</p>
     </section>

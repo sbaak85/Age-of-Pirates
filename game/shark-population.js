@@ -15,7 +15,7 @@ export function populateSharks(encounters,{regions,navigable,regionAt,restricted
   t.name=`${region.name} · ${t.sharkVariant===0?'礁岩巨顎':'碧海獵手'}`;
   let found=false;
   for(let attempt=0;attempt<5000;attempt++){
-   const angle=region.angle+(random()-.5)*.9,radius=72+random()*57;
+   const angle=region.angle+(random()-.5)*.9,radius=region.id==='fjord'?148+random()*57:72+random()*57;
    const x=Math.cos(angle)*radius,z=Math.sin(angle)*radius;
    if(!navigable(x,z,t.radius+2)||restricted(t,x,z)||regionAt(x,z).id!==t.region)continue;
    if(occupied.some(o=>Math.hypot(x-o.start[0],z-o.start[1])<t.radius+o.radius+4))continue;

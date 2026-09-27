@@ -1,0 +1,2 @@
+#kraken-announcement{position:absolute;z-index:6;top:15%;left:50%;transform:translateX(-50%);max-width:min(680px,90vw);padding:13px 22px;border:1px solid #edbf72;border-radius:6px;background:linear-gradient(90deg,#112e3aed,#284957f5,#112e3aed);color:#ffe2a7;text-align:center;font-weight:700;font-size:16px;line-height:1.5;text-shadow:0 2px 4px #061c28;box-shadow:0 5px 22px #031c3866;pointer-events:none}
+#kraken-announcement[hidden]{display:none}

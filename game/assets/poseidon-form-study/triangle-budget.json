@@ -1,0 +1,121 @@
+{
+  "triangles": 500,
+  "parts": [
+    {
+      "name": "八角低台",
+      "triangles": 28
+    },
+    {
+      "name": "右側承重腿",
+      "triangles": 20
+    },
+    {
+      "name": "左侧前踏腿",
+      "triangles": 20
+    },
+    {
+      "name": "足部",
+      "triangles": 12
+    },
+    {
+      "name": "足部",
+      "triangles": 12
+    },
+    {
+      "name": "胸廓與腰胯",
+      "triangles": 60
+    },
+    {
+      "name": "頸部",
+      "triangles": 12
+    },
+    {
+      "name": "張開持戟臂",
+      "triangles": 20
+    },
+    {
+      "name": "垂落右臂",
+      "triangles": 20
+    },
+    {
+      "name": "握戟手",
+      "triangles": 12
+    },
+    {
+      "name": "垂落手",
+      "triangles": 12
+    },
+    {
+      "name": "俯視頭部",
+      "triangles": 44
+    },
+    {
+      "name": "眉骨與鼻樑",
+      "triangles": 5
+    },
+    {
+      "name": "眼窩陰影",
+      "triangles": 2
+    },
+    {
+      "name": "楔形長鬚",
+      "triangles": 20
+    },
+    {
+      "name": "後側鬃髮",
+      "triangles": 24
+    },
+    {
+      "name": "王冠箍",
+      "triangles": 12
+    },
+    {
+      "name": "冠尖",
+      "triangles": 1
+    },
+    {
+      "name": "冠尖",
+      "triangles": 1
+    },
+    {
+      "name": "冠尖",
+      "triangles": 1
+    },
+    {
+      "name": "冠尖",
+      "triangles": 1
+    },
+    {
+      "name": "冠尖",
+      "triangles": 1
+    },
+    {
+      "name": "單肩後披風",
+      "triangles": 26
+    },
+    {
+      "name": "斜跨胸前與垂墜衣褶",
+      "triangles": 17
+    },
+    {
+      "name": "環腰後裙",
+      "triangles": 16
+    },
+    {
+      "name": "披袍斜邊",
+      "triangles": 6
+    },
+    {
+      "name": "肩部圓扣",
+      "triangles": 3
+    },
+    {
+      "name": "三叉戟長柄",
+      "triangles": 20
+    },
+    {
+      "name": "海神三叉戟",
+      "triangles": 72
+    }
+  ]
+}

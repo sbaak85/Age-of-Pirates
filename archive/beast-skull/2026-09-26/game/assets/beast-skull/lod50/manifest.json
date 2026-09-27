@@ -1,0 +1,144 @@
+{
+  "version": 1,
+  "tool": "meshoptimizer 1.2.0",
+  "scope": "Complete fossil meshes, excluding vegetation, terrain and ship",
+  "originalTriangles": 439614,
+  "reducedTriangles": 219898,
+  "parts": [
+    {
+      "key": "mandible",
+      "name": "mandible",
+      "originalTriangles": 87626,
+      "triangles": 43812,
+      "vertices": 21904,
+      "error": 0.0001431232230970636,
+      "sourceHash": "33c103b2a7f044f68073423112984b1fb5490cb06fb72ef5fc0aef2be7d1a660",
+      "attributes": {
+        "position": {
+          "file": "mandible-position.bin",
+          "itemSize": 3
+        },
+        "color": {
+          "file": "mandible-color.bin",
+          "itemSize": 3
+        },
+        "normal": {
+          "file": "mandible-normal.bin",
+          "itemSize": 3
+        },
+        "uv": {
+          "file": "mandible-uv.bin",
+          "itemSize": 2
+        }
+      },
+      "index": "mandible-indices.bin"
+    },
+    {
+      "key": "cranium",
+      "name": "cranium",
+      "originalTriangles": 263156,
+      "triangles": 131578,
+      "vertices": 65771,
+      "error": 0.00012577282905112952,
+      "sourceHash": "64d5bfc3ccfa0eb7765c4f7bc073d20f83a20cbeea44eb13da841430020ad2c3",
+      "attributes": {
+        "position": {
+          "file": "cranium-position.bin",
+          "itemSize": 3
+        },
+        "color": {
+          "file": "cranium-color.bin",
+          "itemSize": 3
+        },
+        "normal": {
+          "file": "cranium-normal.bin",
+          "itemSize": 3
+        },
+        "uv": {
+          "file": "cranium-uv.bin",
+          "itemSize": 2
+        }
+      },
+      "index": "cranium-indices.bin"
+    },
+    {
+      "key": "teeth",
+      "name": "Static fossil / vegetation batch",
+      "originalTriangles": 58752,
+      "triangles": 29468,
+      "vertices": 18066,
+      "error": 0.0002861419052351266,
+      "sourceHash": "c9b4c879659b4193552dc991a9c8741e044a2cd781f7fdcbc82adb1d1152ae1c",
+      "attributes": {
+        "position": {
+          "file": "teeth-position.bin",
+          "itemSize": 3
+        },
+        "uv": {
+          "file": "teeth-uv.bin",
+          "itemSize": 2
+        },
+        "normal": {
+          "file": "teeth-normal.bin",
+          "itemSize": 3
+        },
+        "color": {
+          "file": "teeth-color.bin",
+          "itemSize": 3
+        }
+      },
+      "index": "teeth-indices.bin",
+      "components": 68,
+      "edit": "Removed two frontmost lower teeth per side from existing LOD; retained triangles and vertex attributes unchanged."
+    },
+    {
+      "key": "axial-bones",
+      "name": "Static fossil / vegetation batch",
+      "originalTriangles": 17984,
+      "triangles": 8992,
+      "vertices": 5588,
+      "error": 0.001244366285391152,
+      "sourceHash": "e3a12e7bd2ac7d3bef7e99a2b680e80dc66df6b8003d984be4a4dfc9f6677b5e",
+      "attributes": {
+        "position": {
+          "file": "axial-bones-position.bin",
+          "itemSize": 3
+        },
+        "normal": {
+          "file": "axial-bones-normal.bin",
+          "itemSize": 3
+        },
+        "uv": {
+          "file": "axial-bones-uv.bin",
+          "itemSize": 2
+        }
+      },
+      "index": "axial-bones-indices.bin"
+    },
+    {
+      "key": "sutures",
+      "name": "Static fossil / vegetation batch",
+      "originalTriangles": 12096,
+      "triangles": 6048,
+      "vertices": 3710,
+      "error": 0.00012566916120704263,
+      "sourceHash": "65cab497f9efb3ddb7d2cb8889e16dc25feb098a90312b64a95c7a714631af20",
+      "attributes": {
+        "position": {
+          "file": "sutures-position.bin",
+          "itemSize": 3
+        },
+        "uv": {
+          "file": "sutures-uv.bin",
+          "itemSize": 2
+        },
+        "normal": {
+          "file": "sutures-normal.bin",
+          "itemSize": 3
+        }
+      },
+      "index": "sutures-indices.bin"
+    }
+  ],
+  "reduction": 0.49979300022292283
+}

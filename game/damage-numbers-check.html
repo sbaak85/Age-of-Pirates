@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="zh-Hant"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>傷害數字預覽</title>
+<link rel="stylesheet" href="/game/upgrades.css"><link rel="stylesheet" href="/game/damage-numbers.css">
+<style>body{margin:0;overflow:hidden;background:#13758c;font:14px system-ui;color:#fff}aside{position:absolute;z-index:10;left:22px;top:20px;padding:14px;background:#082d3ddd;border-radius:8px}button{margin-right:8px;padding:8px;cursor:pointer}.target-label{font-family:"Segoe UI",sans-serif}#target-labels{z-index:2}</style>
+<script type="importmap">{"imports":{"three":"/vendor/three/build/three.module.js","three/addons/":"/vendor/three/examples/jsm/"}}</script>
+<aside>傷害數字 · 共用正式遊戲元件<p><button id="replay">重播四連命中</button><button id="pause">暫停</button></p><output id="status"></output></aside>
+<div id="target-labels"><div class="target-label" id="label"><span>蒼壁峽灣 · 巡防海盜</span><div class="health-track"><i></i></div><small>70 / 70</small></div></div>
+<div id="damage-numbers" aria-hidden="true"></div>
+<script type="module">
+import * as THREE from 'three';
+import {createTargetModel} from './models.js';
+import {Effects} from './feedback.js';
+import {createDamageNumbers} from './damage-numbers.js';
+const scene=new THREE.Scene();scene.background=new THREE.Color(0x13758c);
+const camera=new THREE.PerspectiveCamera(45,innerWidth/innerHeight,.1,100);camera.position.set(10,12,16);camera.lookAt(0,2,0);camera.updateMatrixWorld();
+const renderer=new THREE.WebGLRenderer({antialias:true});renderer.setPixelRatio(Math.min(devicePixelRatio,1.5));renderer.setSize(innerWidth,innerHeight);renderer.toneMapping=THREE.ACESFilmicToneMapping;document.body.append(renderer.domElement);
+scene.add(new THREE.HemisphereLight(0xe8f7ff,0x223a40,2.5));const light=new THREE.DirectionalLight(0xffebc9,2);light.position.set(8,12,5);scene.add(light);
+const target={type:'ship',color:0x35566c,x:0,z:0,health:70,alive:true};const model=createTargetModel(target);scene.add(model.group);
+const effects=new Effects(scene),numbers=createDamageNumbers(document.querySelector('#damage-numbers')),label=document.querySelector('#label'),point=new THREE.Vector3();
+let time=0,last=performance.now(),shot=0,paused=false;
+const freeze=new URLSearchParams(location.search).has('freeze')?Number(new URLSearchParams(location.search).get('freeze')):Infinity;
+function replay(){time=0;shot=0;target.health=70;target.alive=true;model.group.visible=true;numbers.clear();effects.clear();}
+document.querySelector('#replay').onclick=replay;
+document.querySelector('#pause').onclick=()=>{paused=!paused;document.querySelector('#pause').textContent=paused?'繼續':'暫停';};
+function project(){point.set(target.x,5.5,target.z).project(camera);return{x:(point.x*.5+.5)*innerWidth,y:(-point.y*.5+.5)*innerHeight+18,visible:true};}
+function frame(now){const dt=paused?0:Math.min(.05,(now-last)/1000,Math.max(0,freeze-time));last=now;time+=dt;
+ while(shot<4&&time>=shot*.3){const amount=[15,20,15,20][shot++];target.health-=amount;numbers.spawn(target,amount,time);effects.explosion(0,1.5,0,target.health?'impact':'kill');if(!target.health){target.alive=false;model.group.visible=false;}}
+ label.hidden=!target.alive;const anchor=project();label.style.transform=`translate(${anchor.x}px,${anchor.y-18}px)`;label.querySelector('i').style.transform=`scaleX(${target.health/70})`;label.querySelector('small').textContent=`${target.health} / 70`;
+ numbers.update(time,project);effects.update(dt,camera);renderer.render(scene,camera);document.querySelector('#status').textContent=`命中 ${shot} / 4 · ${time.toFixed(2)}s`;if(time>3.4)replay();requestAnimationFrame(frame);
+}requestAnimationFrame(frame);
+window.addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
+</script></html>

@@ -167,44 +167,79 @@ function house(g,r,x,y,z,slot,detail){
  return type;
 }
 function sideOffset(i,w){return (i-1.5)*w*.23;}
-function reefCottage(g,x,y,z,slot,detail){
- const type=slot%4,raised=type===0?.85:.35,w=type===2?4.45:3.65,d=type===1?4.25:3.25;
- const wall=[0xf2dfbc,0xe8e5ca,0xe1c7aa,0xf2d7b1][slot%4],roof=[0xd87a61,0x3e9799,0xe2a16a,0x6dafa0][slot%4],timber=0x876c52;
- box(g,0xc9a37a,x,y+raised*.5,z,w+1,raised+.22,d+1);
- for(const sx of [-1,1])for(const sz of [-1,1])box(g,timber,x+sx*w*.43,y+raised*.5,z+sz*d*.42,.22,raised+.3,.22);
- box(g,wall,x,y+raised+1.65,z,w,3.3,d);
- const roofMesh=add(g,roofGeo,roof,x,y+raised+3.95,z,w*.64,1.35,d*.70);roofMesh.rotation.y=type===3?Math.PI/2:0;
- box(g,0xf7e5c0,x,y+raised+.35,z+d*.77,w+1.6,.18,2.15);
- for(const side of [-1,1]){
-  box(g,timber,x+side*(w*.5+.38),y+raised+1.15,z+d*.74,.14,1.65,.14);
-  box(g,0x4e9dad,x+side*w*.25,y+raised+2.15,z+d*.52,.70,.85,.08);
-  box(g,0xf8e4b7,x+side*w*.25,y+raised+2.15,z+d*.59,.49,.57,.05);
+export function reefCottage(g,x,y,z,slot,detail){
+ const type=slot%4,variation=Math.floor(slot/4)%3;
+ const w=type===2?4.45:3.65,d=type===1?4.25:3.25;
+ const floor=type===0?.90:.42,h=type===1?3.6:3.3,top=floor+h;
+ const wall=[0xf2dfbc,0xe8e5ca,0xe1c7aa,0xf2d7b1][type],roof=[0xd87a61,0x3e9799,0xe2a16a,0x6dafa0][type],wood=0x876c52,trim=0xf7e5c0;
+ const porchDepth=type===2?1.85:1.55,front=d/2+porchDepth,pw=w+.55;
+ const part=(name,c,xx,yy,zz,ww,hh,dd)=>{const m=box(g,c,x+xx,y+yy,z+zz,ww,hh,dd);m.name=name;return m;};
+ // All heights share a finished-floor datum; every stair reaches ground.
+ part('主屋基座',0xc9a37a,0,(floor-.12)/2,0,w+.24,floor-.12,d+.24);
+ part('主屋樓板',trim,0,floor-.10,0,w+.28,.20,d+.28);
+ part('門廊地板',trim,0,floor-.10,(d/2+front)/2,pw,.20,porchDepth+.12);
+ for(const side of [-1,1])part('門廊承重柱',wood,side*(pw/2-.15),floor/2,front-.12,.20,floor,.20);
+ part('完整牆體',wall,0,floor+h/2,0,w,h,d);
+ part('屋頂簷口',trim,0,top-.04,0,w+.32,.18,d+.32);
+ const cross=type===3,over=.34,pitch=type===0?1.5:type===1?1.25:1.35;
+ const r=add(g,roofGeo,roof,x,y+top-.025,z,cross?d/2+over:w/2+over,pitch,cross?w/2+over:d/2+over);
+ r.name='貼合牆頂的完整屋頂';r.rotation.y=cross?Math.PI/2:0;
+ const stepCount=Math.ceil(floor/.18),tread=.32,stairWidth=type===2?1.8:1.45;
+ for(let i=0;i<stepCount;i++){
+  const height=floor*(1-i/stepCount);
+  part('落地階梯 '+i,0xe5c797,0,height/2,front+tread*(i+.5)-.025,stairWidth,height,tread+.025);
  }
- box(g,0x765846,x,y+raised+1.18,z+d*.53,.82,1.85,.10);
+ part('門框',trim,0,floor+1.12,d/2+.055,1.15,2.24,.16);
+ part('木門',0x765846,0,floor+1.04,d/2+.15,.89,2.08,.08);
+ // Covered porches have short beams seated between the wall and front posts.
+ if(type!==3){
+  const depth=porchDepth+.18,cy=floor+2.75,cz=d/2+porchDepth/2;
+  const canopy=part('門廊斜棚',roof,0,cy,cz,pw+.18,.16,depth);canopy.rotation.x=.14;
+  const beamY=cy-Math.sin(.14)*porchDepth/2-.12;
+  part('門廊前承樑',wood,0,beamY,front-.06,pw,.18,.18);
+  for(const side of [-1,1])part('接合棚頂的立柱',wood,side*(pw/2-.15),(floor+beamY)/2,front-.06,.18,beamY-floor,.18);
+ }
+ for(const side of [-1,1]){
+  const railX=side*(pw/2-.12);
+  part('側欄扶手',wood,railX,floor+.85,d/2+porchDepth/2,.12,.12,porchDepth);
+  for(const zz of [d/2+.10,front-.10])part('欄杆立柱',wood,railX,floor+.43,zz,.13,.86,.13);
+  part('樓梯口立柱',wood,side*(stairWidth/2+.055),floor+.43,front-.10,.11,.86,.11);
+  part('入口分段扶手',wood,side*(stairWidth/2+(pw-stairWidth)/4),floor+.85,front-.10,(pw-stairWidth)/2,.12,.12);
+ }
+ // Windows lie against the wall, with shutters and supported planter boxes.
+ for(const side of [-1,1])for(const depth of (type===1?[-.27,.27]:[0])){
+  const zz=depth*d,wx=side*(w/2+.055);
+  part('側窗框',trim,wx,floor+1.95,zz,.15,1.30,1.10);
+  part('側窗玻璃',0x367d84,wx+side*.09,floor+1.95,zz,.07,1.04,.86);
+  if(detail){
+   for(const edge of [-1,1])part('側窗百葉',variation===1?roof:wood,wx+side*.12,floor+1.95,zz+edge*.60,.12,1.20,.25);
+   part('窗台',trim,wx+side*.12,floor+1.28,zz,.36,.14,1.35);
+  }
+ }
  if(!detail)return;
  for(const side of [-1,1]){
-  for(const depth of [-.25,.28]){
-   const wx=x+side*(w*.5+.07),wz=z+depth*d;
-   box(g,0xf9e8c8,wx,y+raised+2.05,wz,.16,1.25,.96);
-   box(g,0x438f98,wx+side*.10,y+raised+2.08,wz,.08,.96,.68);
-   box(g,0xe2b979,wx+side*.16,y+raised+2.08,wz-.40,.10,1.02,.12);
-   box(g,0xe2b979,wx+side*.16,y+raised+2.08,wz+.40,.10,1.02,.12);
-  }
-  box(g,timber,x+side*w*.49,y+raised+1.9,z-d*.48,.12,3.56,.12);
+  part('正面窗框',trim,side*w*.32,floor+1.80,d/2+.075,.67,.95,.16);
+  part('正面窗',0x438f98,side*w*.32,floor+1.80,d/2+.17,.47,.72,.06);
+  part('牆角木構',wood,side*(w/2-.06),floor+h/2,-d/2-.025,.12,h,.10);
  }
- box(g,0xf7e8cd,x,y+raised+3.45,z-d*.52,w+.45,.20,.16);
- box(g,timber,x,y+raised+3.96,z,w*.12,.14,d*1.44);
- for(let i=0;i<6;i++)box(g,i%2?0xf5e0bb:roof,x+(i-2.5)*((w+1.3)/6),y+raised+3.92,z+d*.82,.16,.11,2.18);
- for(const side of [-1,1]){
-  box(g,timber,x+side*(w*.5+.36),y+raised+.94,z+d*1.33,.10,1.15,.10);
-  box(g,0xd9bd91,x+side*w*.24,y+raised+.71,z+d*1.26,.86,.16,.67);
-  add(g,leafGeo,side>0?0x709b6f:0x88b483,x+side*(w*.5+.45),y+raised+.82,z+d*.20,.54,.63,.54);
-  box(g,timber,x+side*w*.50,y+raised+.68,z+d*.55,.12,.34,d*1.65);
+ part('後窗框',trim,0,floor+1.85,-d/2-.07,1.1,1.25,.16);
+ part('後窗',0x438f98,0,floor+1.85,-d/2-.16,.86,1.02,.07);
+ part('後窗中梃',trim,0,floor+1.85,-d/2-.21,.08,1.02,.06);
+ const planterSide=variation===1?-1:1;
+ part('落地花箱',wood,planterSide*(w/2-.45),floor+.18,front-.42,.62,.36,.58);
+ add(g,leafGeo,variation===2?0x789b69:0x599978,x+planterSide*(w/2-.45),y+floor+.57,z+front-.42,.43,.40,.40);
+ if(variation===0){
+  part('門牌',wood,-.70,floor+2.50,d/2+.045,.36,.25,.10);
+ }else if(variation===1){
+  part('門旁燈架',wood,.66,floor+2.25,d/2+.20,.12,.12,.44);
+  part('壁燈',0xe6bd75,.66,floor+2.02,d/2+.32,.22,.36,.22);
+ }else{
+  const bx=-planterSide*(w/2-.45),bz=d/2+.65;
+  part('長凳座',wood,bx,floor+.46,bz,.65,.14,.80);
+  for(const zz of [-.27,.27])part('長凳腳',wood,bx,floor+.20,bz+zz,.42,.40,.12);
  }
- box(g,timber,x,y+raised+1.35,z+d*1.50,w+1.55,.10,.10);
- for(let i=0;i<3;i++)box(g,0xe5c797,x,y+raised-.05-i*.16,z+d*1.70+i*.38,w*.75-i*.16,.14,.38);
 }
-function createReefChapel(t){
+export function createReefChapel(t){
  const g=new THREE.Group();g.name='翡翠環礁 · 主島海濱大教堂';g.position.set(t.x,t.h,t.z);
  const plaster=0xf0dfbc,trim=0xffedc9,stone=0xc9ba91,teal=0x427e83,roof=0x4a9b9d;
  box(g,stone,0,.26,0,13,.52,17);
@@ -218,8 +253,8 @@ function createReefChapel(t){
    box(g,trim,side*5.77,3.83,zz,.15,.16,2.1);
   }
  }
- const naveRoof=add(g,roofGeo,roof,0,10.65,0,6.55,3.15,7.5);naveRoof.rotation.y=Math.PI/2;
- for(const side of [-1,1])for(let i=0;i<5;i++)box(g,side<0?0xd2bd91:trim,side*5.72,9.25,-5.5+i*2.7,.24,.25,.30);
+ const naveRoof=add(g,roofGeo,roof,0,8.93,0,5.95,3.15,7.4);naveRoof.name='教堂貼合屋頂';
+ for(const side of [-1,1])for(let i=0;i<5;i++)box(g,side<0?0xd2bd91:trim,side*5.48,8.90,-5.5+i*2.7,.24,.25,.30);
  box(g,stone,0,1.0,8.25,6.1,2.0,6.0);
  box(g,plaster,0,7.0,8.25,5.0,12.2,5.0);
  for(let level=0;level<3;level++){
@@ -233,14 +268,14 @@ function createReefChapel(t){
  add(g,coneGeo,roof,0,15.35,8.25,3.6,3.6,3.6);
  box(g,0xd6b878,0,18.20,8.25,.30,2.2,.32);
  box(g,0xd6b878,0,18.60,8.25,1.25,.29,.32);
- box(g,teal,0,3.17,7.18,2.35,4.7,.20);
- add(g,roundGeo,0x93c9c2,0,5.54,7.28,1.17,1.04,.16);
- for(let i=0;i<7;i++)box(g,i%2?0xe8d0a0:trim,0,.18+i*.17,11.3+i*.48,4.1-i*.14,.18,.48);
- for(let i=0;i<5;i++)box(g,i%2?0xd8c69a:0xf4e3ba,0,.10,14.8+i*.77,3.8-i*.26,.13,.68);
+ box(g,teal,0,4.0,10.82,2.35,4.0,.20);
+ add(g,roundGeo,0x93c9c2,0,6.0,10.94,1.17,1.04,.16);
+ for(let i=0;i<10;i++){const height=2.0-i*.2;box(g,i%2?0xe8d0a0:trim,0,height/2,11.22+i*.36,4.1,height,.38);}
+ for(let i=0;i<5;i++)box(g,i%2?0xd8c69a:0xf4e3ba,0,.065,14.65+i*.68,3.8-i*.26,.13,.70);
  for(const side of [-1,1]){
-  add(g,roundGeo,0xbba883,side*3.9,.36,12.4,.93,.36,.93);
-  add(g,leafGeo,side<0?0x73a876:0x88b37e,side*3.9,.92,12.4,1.05,.65,.95);
-  box(g,0x8f7758,side*4.75,1.25,10.6,.17,2.0,.17);
+  add(g,roundGeo,0xbba883,side*3.9,.18,12.4,.93,.36,.93);
+  add(g,leafGeo,side<0?0x73a876:0x88b37e,side*3.9,.80,12.4,1.05,.65,.95);
+  box(g,0x8f7758,side*4.75,1.15,10.6,.17,2.3,.17);
   add(g,roundGeo,0xf6d6a0,side*4.75,2.32,10.6,.35,.42,.35);
  }
  instanceKit(g);return g;
@@ -1004,6 +1039,7 @@ export function createVillageBase(r){
  consolidateChunk(homes);instanceKit(g);return g;
 }
 export function* detailsForRegion(r){
+ if(r.id==='fjord')return; // The authored castle town replaces the old streamed settlement.
  const u={x:Math.cos(r.angle),z:Math.sin(r.angle)},v={x:-u.z,z:u.x};
  if(r.id==='reef'){
   for(const s of villageSlots(r)){
@@ -1259,7 +1295,7 @@ function createRedrockGrandArch(){
 }
 export function createArches(scene){
  scene.add(createRedrockGrandArch());
- for(const [x,z,width,y,rot] of [[0,0,22,18,0],[-151,-65,22,19,Math.PI/2],[83,123,20,17,Math.PI/2]]){
+ for(const [x,z,width,y,rot] of [[-151,-65,22,19,Math.PI/2],[83,123,20,17,Math.PI/2]]){
   if(x<0){
    const gate=new THREE.Group();gate.name='赤岩群柱 · 天然海蝕拱';gate.position.set(x,0,z);gate.rotation.y=rot;
    // A fractured crown grows out of two eroded cliff feet. Unlike a torus,
